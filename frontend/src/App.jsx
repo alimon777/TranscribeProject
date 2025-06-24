@@ -31,6 +31,8 @@ import {
   Move,
   Ellipsis,
   SquareArrowOutUpRight,
+  ArrowUpNarrowWide,
+  ArrowDownNarrowWide,
 } from 'lucide-react';
 
 // Shadcn/ui components (assumed globally registered)
@@ -100,6 +102,7 @@ import {
   deleteNodeRecursiveById,
   getNodePath,
 } from './lib/tree-utils';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './components/ui/dropdown-menu';
 
 /* ============================================
    Reusable Components and Hooks
@@ -1401,14 +1404,20 @@ const getAllDescendantFolderIds = (nodes, targetId) => {
 ============================================ */
 const RepositoryPage = () => {
   const [treeData, setTreeData] = useState([]);
-  const [selectedFolder, setSelectedFolder] = useState('all'); // MODIFIED: Default to 'all'
+  const [selectedFolder, setSelectedFolder] = useState('all');
   const [transcriptions, setTranscriptions] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedTranscription, setSelectedTranscription] = useState(null);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
 
-  // Use the common folder operations hook
+  const [sortField, setSortField] = useState('processed_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  // NEW_MOD: State for status filters
+  const [activeStatusFilters, setActiveStatusFilters] = useState(new Set()); // Stores selected statuses
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
   const { handleAdd, handleRename, handleDelete } = useFolderOperations(
     treeData,
     setTreeData,
@@ -1416,7 +1425,6 @@ const RepositoryPage = () => {
     setSelectedFolder
   );
 
-  // load repository data on mount
   const reload = useCallback(async () => {
     const repo = await mockFetchRepository();
     setTranscriptions(repo.transcriptions);
@@ -1427,35 +1435,70 @@ const RepositoryPage = () => {
     reload();
   }, [reload]);
 
-  // Filter transcriptions by folder (recursively) and search term
-  const list = useMemo(() => {
-    let effectiveFolderIds = null; // null means all items (for 'all' selection)
+  const toggleSortOrder = () => {
+    setSortOrder(prevOrder => (prevOrder === 'asc' ? 'desc' : 'asc'));
+  };
 
+  // NEW_MOD: Handle status filter change
+  const handleStatusFilterChange = (status, checked) => {
+    setActiveStatusFilters(prevFilters => {
+      const newFilters = new Set(prevFilters);
+      if (checked) {
+        newFilters.add(status);
+      } else {
+        newFilters.delete(status);
+      }
+      return newFilters;
+    });
+  };
+
+  const list = useMemo(() => {
+    let effectiveFolderIds = null;
     if (selectedFolder && selectedFolder !== 'all' && treeData.length > 0) {
       effectiveFolderIds = getAllDescendantFolderIds(treeData, selectedFolder);
     }
 
-    return transcriptions
-      .filter(t => {
-        if (effectiveFolderIds === null) { // This handles selectedFolder === 'all'
-          return true;
-        }
-        // If a specific folder (and its children) are selected, filter by those IDs.
-        // If effectiveFolderIds is an empty array (e.g., folder not found or folder has no items and no self-items),
-        // then this will correctly filter out all items.
+    let filteredTranscriptions = transcriptions
+      .filter(t => { // Folder filter
+        if (effectiveFolderIds === null) return true;
         return effectiveFolderIds.includes(t.folder_id);
       })
-      .filter(
-        (t) =>
+      .filter(t => { // Search filter
+        return (
           !search ||
           t.session_title.toLowerCase().includes(search.toLowerCase()) ||
-          (t.topics && t.topics.some(topic => topic.toLowerCase().includes(search.toLowerCase()))) || // Search topics
-          (t.cleaned_transcript_text && t.cleaned_transcript_text.toLowerCase().includes(search.toLowerCase())) // Search content
-      );
-  }, [transcriptions, selectedFolder, treeData, search]);
+          (t.topics && t.topics.some(topic => topic.toLowerCase().includes(search.toLowerCase()))) ||
+          (t.cleaned_transcript_text && t.cleaned_transcript_text.toLowerCase().includes(search.toLowerCase()))
+        );
+      })
+      .filter(t => { // NEW_MOD: Status filter
+        if (activeStatusFilters.size === 0) return true; // If no filters, show all
+        return activeStatusFilters.has(t.status);
+      });
 
+    if (sortField) { // Sorting logic
+      filteredTranscriptions = [...filteredTranscriptions].sort((a, b) => {
+        let valA = a[sortField];
+        let valB = b[sortField];
+        if (sortField === 'processed_at' || sortField === 'uploaded_at' || sortField === 'updated_at' || sortField === 'integrated_at') {
+          valA = new Date(valA || 0).getTime();
+          valB = new Date(valB || 0).getTime();
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          valA = valA.toLowerCase();
+          valB = valB.toLowerCase();
+        } else if (valA === null || valA === undefined) {
+          return sortOrder === 'asc' ? -1 : 1;
+        } else if (valB === null || valB === undefined) {
+          return sortOrder === 'asc' ? 1 : -1;
+        }
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return filteredTranscriptions;
+  }, [transcriptions, selectedFolder, treeData, search, sortField, sortOrder, activeStatusFilters]); // Added activeStatusFilters dependency
 
-  // Get folder name from treeData
   const getFolderName = (folderId) => {
     if (!folderId || folderId === 'all') return 'All Transcriptions';
     const findFolder = (nodes) => {
@@ -1471,10 +1514,8 @@ const RepositoryPage = () => {
     return findFolder(treeData) || 'Unknown Folder';
   };
 
-  // Handler for moving a transcription
   const handleMoveTranscription = (targetFolderId, pathArray) => {
     if (!selectedTranscription) return;
-    // update folder_id of the selected transcription
     setTranscriptions((prev) =>
       prev.map((t) =>
         t.id === selectedTranscription.id
@@ -1488,10 +1529,9 @@ const RepositoryPage = () => {
       )}. (Mock behavior, refresh may be needed for persistent storage)`
     );
     setSelectedTranscription(null);
-    setMoveModalOpen(false); // Close modal after move
+    setMoveModalOpen(false);
   };
 
-  // Handler for deleting a transcription
   const handleDeleteTranscription = () => {
     if (!selectedTranscription) return;
     if (
@@ -1502,17 +1542,13 @@ const RepositoryPage = () => {
       setTranscriptions((prev) =>
         prev.filter((t) => t.id !== selectedTranscription.id)
       );
-      // Mock API call for deletion could be added here
-      // await mockDeleteTranscription(selectedTranscription.id);
       setSelectedTranscription(null);
-       alert(`Transcription "${selectedTranscription.session_title}" deleted. (Mock behavior)`);
+      alert(`Transcription "${selectedTranscription.session_title}" deleted. (Mock behavior)`);
     }
   };
 
-  // Handler for downloading a transcription
   const handleDownloadTranscription = () => {
     if (!selectedTranscription) return;
-    // Create a simple text file download
     const content = `Title: ${selectedTranscription.session_title}\n\nPurpose: ${selectedTranscription.session_purpose}\nProcessed: ${new Date(selectedTranscription.processed_at).toLocaleString()}\n\nTopics: ${(selectedTranscription.topics || []).join(', ')}\n\nTranscription:\n${selectedTranscription.cleaned_transcript_text}\n\n${selectedTranscription.quiz_content ? 'Quiz:\n' + selectedTranscription.quiz_content : ''}`;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1525,6 +1561,14 @@ const RepositoryPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  // NEW_MOD: Status options for the filter dropdown
+  const statusFilterOptions = [
+    TRANSCRIPTION_STATUSES.INTEGRATED,
+    TRANSCRIPTION_STATUSES.DRAFT,
+    TRANSCRIPTION_STATUSES.ARCHIVED,
+    // TRANSCRIPTION_STATUSES.PROCESSING, // Could add if relevant
+  ];
+
   return (
     <div className="p-4 md:p-6 w-full">
       <div className="mb-6 text-left pl-3 pb-2">
@@ -1536,17 +1580,15 @@ const RepositoryPage = () => {
         </p>
       </div>
       <div className="flex flex-col lg:flex-row gap-6 items-start">
-
-        {/* Sidebar: Folder Tree */}
         <aside className="w-full lg:w-64 border rounded flex-shrink-0">
           <h2 className="font-medium py-4 pl-3">Transcription Directory</h2>
           <div className="w-full border-t p-2">
             <TreeView
               data={treeData}
-              initialSelectedId={selectedFolder} // Reflects default 'all'
+              initialSelectedId={selectedFolder}
               onNodeSelect={(id) => {
                 setSelectedFolder(id);
-                setSelectedTranscription(null); // Deselect transcription when folder changes
+                setSelectedTranscription(null);
               }}
               onNodeAddCommit={handleAdd}
               onNodeEditCommit={handleRename}
@@ -1557,27 +1599,98 @@ const RepositoryPage = () => {
           </div>
         </aside>
 
-        {/* Main Content: Transcriptions Table and Preview */}
         <section className="flex-1 space-y-4 min-w-0">
-          <Input
-            placeholder="Search transcriptions by title, topic or content..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="flex gap-2 items-center">
+            <Input
+              placeholder="Search transcriptions by title, topic or content..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-grow"
+            />
+            <Select value={sortField} onValueChange={setSortField}>
+              <SelectTrigger className="w-[180px] flex-shrink-0">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="session_title">Title</SelectItem>
+                <SelectItem value="processed_at">Date Processed</SelectItem>
+                <SelectItem value="uploaded_at">Date Uploaded</SelectItem>
+                <SelectItem value="session_purpose">Purpose</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={toggleSortOrder} className="flex-shrink-0">
+              {sortOrder === 'asc' ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownNarrowWide className="h-4 w-4" />}
+            </Button>
+            {/* NEW_MOD: Filter DropdownMenu */}
+            <DropdownMenu open={isFilterDropdownOpen} onOpenChange={setIsFilterDropdownOpen}>
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="flex-shrink-0 relative">
+                        <ListFilter className="h-4 w-4" />
+                        {activeStatusFilters.size > 0 && (
+                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary text-primary-foreground text-[8px] items-center justify-center">
+                              {activeStatusFilters.size}
+                            </span>
+                          </span>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filter by Status</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {statusFilterOptions.map((status) => (
+                  <DropdownMenuCheckboxItem
+                    key={status}
+                    checked={activeStatusFilters.has(status)}
+                    onCheckedChange={(checked) => handleStatusFilterChange(status, checked)}
+                    // onSelect={(event) => event.preventDefault()} // Prevent closing on select
+                  >
+                    {status}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {activeStatusFilters.size > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setActiveStatusFilters(new Set())}
+                      className="text-destructive"
+                    >
+                      Clear Filters
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-          <div className="flex gap-6"> {/* This div handles table and preview layout */}
-            {/* Transcriptions Table */}
+          <div className="flex gap-6">
             <div className={`${selectedTranscription ? 'flex-1 min-w-0' : 'w-full'} transition-all duration-300`}>
               <Card className="pb-0">
                 <CardHeader>
                   <CardTitle>
                     Transcriptions in "{getFolderName(selectedFolder)}"
+                    {activeStatusFilters.size > 0 && (
+                       <Badge variant="secondary" className="ml-2 font-normal text-xs">
+                         {activeStatusFilters.size} Status Filter{activeStatusFilters.size > 1 ? 's' : ''} Active
+                       </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   {list.length === 0 ? (
                     <p className="p-4 text-center text-muted-foreground">
-                      No items found.
+                      No items found. Try adjusting your filters or search.
                     </p>
                   ) : (
                     <div className="overflow-x-auto max-h-[345px]"> {/* Added for table horizontal scroll if needed */}
@@ -1631,11 +1744,11 @@ const RepositoryPage = () => {
                               </TableCell>
                               <TableCell className="text-center">
                                 <Button
-                                  variant="ghost" // Changed to ghost for less visual clutter
-                                  size="icon_xs" // Made icon smaller
+                                  variant="ghost"
+                                  size="icon_xs"
                                   onClick={(e) => {
-                                    e.stopPropagation(); // Prevent row click
-                                    setSelectedTranscription(t); // Ensure it's selected for actions panel
+                                    e.stopPropagation();
+                                    setSelectedTranscription(t);
                                   }}
                                 >
                                   <Ellipsis className="h-4 w-4" />
@@ -1651,7 +1764,6 @@ const RepositoryPage = () => {
               </Card>
             </div>
 
-            {/* Preview Panel (appears on the right of the table) */}
             {selectedTranscription && (
               <TranscriptionPreview
                 transcription={selectedTranscription}
@@ -1667,7 +1779,6 @@ const RepositoryPage = () => {
         </section>
       </div>
 
-      {/* Expanded Preview Dialog */}
       {selectedTranscription && (
         <TranscriptionExpandedPreview
           transcription={selectedTranscription}
@@ -1677,19 +1788,16 @@ const RepositoryPage = () => {
         />
       )}
 
-      {/* Move-to Modal using IntegrationFolderDialog for moving */}
       {moveModalOpen && selectedTranscription && (
         <IntegrationFolderDialog
           isOpen={moveModalOpen}
           onClose={() => setMoveModalOpen(false)}
-          onConfirm={handleMoveTranscription} // Passes (targetFolderId, pathArray)
-          // suggestedPath can be omitted or set to current folder path if desired
+          onConfirm={handleMoveTranscription}
         />
       )}
     </div>
   );
 };
-
 /* ============================================
    IntegrationFolderDialog Component
    (Used for both integration and move-to actions)
