@@ -515,9 +515,11 @@ const UploadPage = ({ setProcessedDataForReview }) => {
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
                     placeholder={`Enter one term per line. e.g.,
-CSP (Cloud Service Provider)
+
+CSP (Cloud Service Provider),
+DB (DataBase)
 Project Cerebro`}
-                    rows={3}
+                    rows={5}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     This helps correct misinterpretations and ensures
@@ -1091,7 +1093,7 @@ const PendingReviewsPage = () => {
                             <Button
                               variant="outline"
                               size="xs"
-                              onClick={() => navigate(`/review`)}
+                              onClick={() => navigate(`/review`)} // Simplified for example, may need to pass item data
                             >
                               <Eye size={12} className="mr-1" /> Review
                             </Button>
@@ -1492,6 +1494,7 @@ const RepositoryPage = () => {
       )}. Please refresh if needed.`
     );
     setSelectedTranscription(null);
+    setMoveModalOpen(false); // Close modal after move
   };
 
   // Handler for deleting a transcription
@@ -1537,7 +1540,7 @@ const RepositoryPage = () => {
       </div>
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Sidebar: Folder Tree */}
-        <aside className="w-full lg:w-64 border rounded p-2 space-y-2">
+        <aside className="w-full lg:w-64 border rounded p-2 space-y-2 flex-shrink-0"> {/* Added flex-shrink-0 */}
           <div className="flex justify-between items-center px-4 pt-3">
             <h2 className="font-medium">Folders</h2>
           </div>
@@ -1554,7 +1557,7 @@ const RepositoryPage = () => {
         </aside>
 
         {/* Main Content: Transcriptions Table and Preview */}
-        <section className="flex-1 space-y-4">
+        <section className="flex-1 space-y-4 min-w-0"> {/* Added min-w-0 */}
           <Input
             placeholder="Search transcriptions…"
             value={search}
@@ -1563,7 +1566,8 @@ const RepositoryPage = () => {
 
           <div className="flex gap-6">
             {/* Transcriptions Table */}
-            <div className={`${selectedTranscription ? 'flex-1' : 'w-full'} transition-all duration-300`}>
+            {/* MODIFIED LINE BELOW */}
+            <div className={`${selectedTranscription ? 'flex-1 min-w-0' : 'w-full'} transition-all duration-300`}>
               <Card>
                 <CardHeader>
                   <CardTitle>
@@ -1576,70 +1580,72 @@ const RepositoryPage = () => {
                       No items found.
                     </p>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Title</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Purpose</TableHead>
-                          <TableHead>Topics</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {list.map((t) => (
-                          <TableRow
-                            key={t.id}
-                            className={`cursor-pointer hover:bg-muted/50 ${selectedTranscription?.id === t.id ? 'bg-muted' : ''
-                              }`}
-                            onClick={() => setSelectedTranscription(t)}
-                          >
-                            <TableCell>
-                              <div className="font-medium">{t.session_title}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {t.source_file_name}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(t.processed_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {t.session_purpose}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {t.topics?.slice(0, 2).map((topic) => (
-                                  <Badge key={topic} variant="outline" className="text-xs">
-                                    {topic}
-                                  </Badge>
-                                ))}
-                                {t.topics?.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{t.topics.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <StatusBadge status={t.status} />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedTranscription(t);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-1" /> View
-                              </Button>
-                            </TableCell>
+                    <div className="overflow-x-auto"> {/* Added for table horizontal scroll if needed */}
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Purpose</TableHead>
+                            <TableHead>Topics</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {list.map((t) => (
+                            <TableRow
+                              key={t.id}
+                              className={`cursor-pointer hover:bg-muted/50 ${selectedTranscription?.id === t.id ? 'bg-muted' : ''
+                                }`}
+                              onClick={() => setSelectedTranscription(t)}
+                            >
+                              <TableCell>
+                                <div className="font-medium">{t.session_title}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {t.source_file_name}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {new Date(t.processed_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {t.session_purpose}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {t.topics?.slice(0, 2).map((topic) => (
+                                    <Badge key={topic} variant="outline" className="text-xs">
+                                      {topic}
+                                    </Badge>
+                                  ))}
+                                  {t.topics?.length > 2 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{t.topics.length - 2}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <StatusBadge status={t.status} />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedTranscription(t);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" /> View
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -1672,7 +1678,7 @@ const RepositoryPage = () => {
       )}
 
       {/* Move-to Modal using IntegrationFolderDialog for moving */}
-      {moveModalOpen && (
+      {moveModalOpen && selectedTranscription && ( /* Ensure selectedTranscription exists for move modal */
         <IntegrationFolderDialog
           isOpen={moveModalOpen}
           onClose={() => setMoveModalOpen(false)}
@@ -1708,23 +1714,17 @@ export function IntegrationFolderDialog({
   useEffect(() => {
     if (isOpen) {
       setTreeData(getFolderTreeData());
-      setSelectedFolder(null);
+      setSelectedFolder(null); // Reset selection when dialog opens
     }
   }, [isOpen]);
 
   const handleConfirm = () => {
     // compute path array by walking up the tree
-    const buildPath = (nodes, targetId, acc = []) => {
-      for (const n of nodes) {
-        const next = [...acc, n.name];
-        if (n.id === targetId) return next;
-        if (n.children?.length) {
-          const found = buildPath(n.children, targetId, next);
-          if (found) return found;
-        }
-      }
-    };
-    const pathArray = selectedFolder ? buildPath(treeData, selectedFolder) : [];
+    const getPathArray = (nodes, targetId) => {
+        const path = getNodePath(nodes, targetId);
+        return path ? path.map(p => p.name) : [];
+    }
+    const pathArray = selectedFolder ? getPathArray(treeData, selectedFolder) : [];
     onConfirm(selectedFolder, pathArray);
     onClose();
   };
@@ -1735,7 +1735,8 @@ export function IntegrationFolderDialog({
         <DialogHeader>
           <DialogTitle>Select Folder</DialogTitle>
           <DialogDescription>
-            Suggested path: {suggestedPath.join(' / ') || '—'}
+            {suggestedPath && suggestedPath.length > 0 && `Suggested path: ${suggestedPath.join(' / ')}`}
+            {!suggestedPath || suggestedPath.length === 0 && `No specific path suggested.`}
             <br />
             Click a folder or create a new one, then confirm.
           </DialogDescription>
@@ -1823,9 +1824,9 @@ const AdminDashboardPage = () => {
     });
   }, []);
 
-  const summaryStats = isLoading
-    ? {}
-    : {
+  const summaryStats = useMemo(() => {
+    if (isLoading) return {};
+    return {
       pending: conflicts.filter(
         (c) => c.status === 'Pending Review'
       ).length,
@@ -1837,6 +1838,8 @@ const AdminDashboardPage = () => {
       ).length,
       total: conflicts.length,
     };
+  }, [conflicts, isLoading]);
+
 
   const statCards = [
     {
@@ -1893,7 +1896,7 @@ const AdminDashboardPage = () => {
               <stat.Icon className={`h-4 w-4 ${stat.color}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold">{stat.value ?? 0}</div>
             </CardContent>
           </Card>
         ))}
