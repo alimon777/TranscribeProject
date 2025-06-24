@@ -7,17 +7,10 @@ import {
   MoreHorizontal,
   Edit2,
   FolderPlus,
-  Trash2,
-  FileText
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  isFolder,
-  countFilesRecursive,
-  findNodeByIdRecursive,
-  getNodePath,
-  hasSubFolders
-} from '@/lib/tree-utils';
+import { isFolder, hasSubFolders } from '@/lib/tree-utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,20 +22,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const TreeItem = React.memo(({
-  item, level, allExpandedIds, currentSelectedId,
-  currentRenamingId, currentRenamingValue,
-  currentAddingUnderParentId, currentNewFolderNameValue,
-  enableEditing, showFiles,
-  onToggleExpand, onSelectNode, onStartRename,
-  onCommitRename, onCancelAllEdits, onTriggerAddSubfolder,
-  onDeleteNode, onNewFolderNameChange,
-  onCommitAddSubfolder, renderRecursiveTreeFn
+  item,
+  level,
+  allExpandedIds,
+  currentSelectedId,
+  currentRenamingId,
+  currentRenamingValue,
+  currentAddingUnderParentId,
+  currentNewFolderNameValue,
+  enableEditing,
+  onToggleExpand,
+  onSelectNode,
+  onStartRename,
+  onCommitRename,
+  onCancelAllEdits,
+  onTriggerAddSubfolder,
+  onDeleteNode,
+  onNewFolderNameChange,
+  onCommitAddSubfolder,
+  renderRecursiveTreeFn
 }) => {
   const isFolderItem = isFolder(item);
-  const fileCount = useMemo(() =>
-    isFolderItem ? countFilesRecursive(item) : 0, [item]
-  );
-  const renameRef = useRef(null), addRef = useRef(null);
+  // Use the folder count provided in the mock data (or default to zero)
+  const fileCount = typeof item.count === 'number' ? item.count : 0;
+  const renameRef = useRef(null);
+  const addRef = useRef(null);
   const isExpanded = allExpandedIds.has(item.id);
   const isSelected = currentSelectedId === item.id;
   const isRenaming = currentRenamingId === item.id;
@@ -54,53 +58,51 @@ const TreeItem = React.memo(({
       renameRef.current.select();
     }
   }, [isRenaming]);
+
   useEffect(() => {
     if (isAdding && addRef.current) addRef.current.focus();
   }, [isAdding]);
 
-  const canToggle = isFolderItem &&
-    ((showFiles && item.children.length > 0) || hasSubFolders(item));
+  const canToggle = isFolderItem && hasSubFolders(item);
 
-  const handleMainClick = e => {
+  const handleMainClick = (e) => {
     e.stopPropagation();
     if (isRenaming) return;
-    onSelectNode?.(item.id, item);
+    onSelectNode?.(item.id);
     if (canToggle) onToggleExpand?.(item.id);
   };
+
   const handleChevronClick = e => {
     e.stopPropagation();
     if (canToggle) onToggleExpand?.(item.id);
   };
 
-  // pick icon
+  // Icon picking now always shows folder icons if it is a folder.
   let IconNode = null;
-  if (item.icon) IconNode = item.icon;
-  else if (isFolderItem) {
+  if (isFolderItem) {
     IconNode = isExpanded
       ? <FolderOpen className="h-3 w-3" />
       : <FolderIconDefault className="h-3 w-3" />;
-  } else if (showFiles) {
-    IconNode = <FileText className="h-3 w-3" />;
   }
 
   return (
-    <li role="treeitem" aria-expanded={canToggle ? isExpanded : undefined}
-      aria-selected={isSelected} className="list-none">
+    <li role="treeitem" aria-expanded={canToggle ? isExpanded : undefined} aria-selected={isSelected} className="list-none">
       <div
         className={cn("flex items-center gap-1 py-1 pr-1 rounded group", {
           "hover:bg-accent": !isRenaming,
           "bg-accent": isSelected
         })}
-        style={{ paddingLeft: `${level*1.0 + 0.5}rem`}}
+        style={{ paddingLeft: `${level * 1.0 + 0.5}rem` }}
         onClick={handleMainClick}
       >
-        {canToggle
-          ? <ChevronRight
-              className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")}
-              onClick={handleChevronClick}
-            />
-          : <span className="inline-block w-3 h-3" />
-        }
+        {canToggle ? (
+          <ChevronRight
+            className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")}
+            onClick={handleChevronClick}
+          />
+        ) : (
+          <span className="inline-block w-3 h-3" />
+        )}
 
         {IconNode && (
           <span className="flex-shrink-0 text-muted-foreground">
@@ -108,23 +110,28 @@ const TreeItem = React.memo(({
           </span>
         )}
 
-        {isRenaming
-          ? <Input
-              ref={renameRef}
-              className="flex-grow text-sm py-0 px-1"
-              value={currentRenamingValue}
-              onChange={e => onCommitRename(item.id, e.target.value, item.name, true)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') onCommitRename(item.id, e.target.value, item.name);
-                if (e.key === 'Escape') onCancelAllEdits();
-              }}
-              onBlur={() => onCommitRename(item.id, currentRenamingValue, item.name)}
-            />
-          : <span className="truncate text-sm flex-grow">
-              {item.name}
-              {isFolderItem && <span className="ml-1 text-[10px] text-muted-foreground">({fileCount})</span>}
-            </span>
-        }
+        {isRenaming ? (
+          <Input
+            ref={renameRef}
+            className="flex-grow text-sm py-0 px-1"
+            value={currentRenamingValue}
+            onChange={e => onCommitRename(item.id, e.target.value, item.name, true)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') onCommitRename(item.id, e.target.value, item.name);
+              if (e.key === 'Escape') onCancelAllEdits();
+            }}
+            onBlur={() => onCommitRename(item.id, currentRenamingValue, item.name)}
+          />
+        ) : (
+          <span className="truncate text-sm flex-grow">
+            {item.name}
+            {isFolderItem && (
+              <span className="ml-1 text-[10px] text-muted-foreground">
+                ({fileCount})
+              </span>
+            )}
+          </span>
+        )}
 
         {enableEditing && isFolderItem && !isRenaming && (
           <DropdownMenu>
@@ -143,8 +150,7 @@ const TreeItem = React.memo(({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDeleteNode(item.id)}
-                disabled={fileCount > 0}
-                className={cn(fileCount > 0 ? "text-muted-foreground" : "text-destructive")}
+                className="text-destructive"
               >
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
               </DropdownMenuItem>
@@ -156,7 +162,7 @@ const TreeItem = React.memo(({
       {isAdding && enableEditing && (
         <div
           className="flex items-center gap-1 py-1 pr-1"
-          style={{ paddingLeft: `${(level+1)*1.0 + 0.5}rem` }}
+          style={{ paddingLeft: `${(level + 1) * 1.0 + 0.5}rem` }}
         >
           <span className="inline-block w-3 h-3" />
           <FolderIconDefault className="h-3 w-3 text-muted-foreground" />
@@ -175,7 +181,7 @@ const TreeItem = React.memo(({
         </div>
       )}
 
-      {isFolderItem && isExpanded && item.children.length > 0 && (
+      {isFolderItem && isExpanded && item.children && item.children.length > 0 && (
         <ul role="group">
           {renderRecursiveTreeFn(item.children, level + 1)}
         </ul>
@@ -194,7 +200,6 @@ export const TreeView = ({
   onNodeDeleteCommit,
   onNodeAddCommit,
   enableEditing = true,
-  showFiles = true,
   allowRootFolderAdd = false,
   className
 }) => {
@@ -225,6 +230,7 @@ export const TreeView = ({
     setRenamingId(id);
     setRenamingVal(name);
   };
+
   const commitRename = async (id, val, oldName, intermediate = false) => {
     if (intermediate) {
       setRenamingVal(val);
@@ -245,69 +251,59 @@ export const TreeView = ({
       setExpandedIds(s => new Set(s).add(parentId));
     }
   };
+
   const commitAdd = async () => {
     const name = newNameVal.trim();
     const pid = addingId;
     cancelAll();
     if (!name) return;
-    const propId = `${pid||'root'}-${Date.now()}`;
-    const path = pid ? getNodePath(data, pid) : [];
-    await onNodeAddCommit?.(pid, name, propId, [...(path||[]), name]);
+    const propId = `${pid || 'root'}-${Date.now()}`;
+    const path = []; // if needed, you can implement a function to get the path
+    await onNodeAddCommit?.(pid, name, propId, [...path, name]);
   };
 
-  const deleteNode = async id => {
+  const deleteNode = async (id) => {
     cancelAll();
-    const node = findNodeByIdRecursive(data, id);
-    if (!node) return;
-    if (window.confirm(`Delete "${node.name}"?`)) {
-      await onNodeDeleteCommit?.(id, node.name);
-    }
+    await onNodeDeleteCommit?.(id);
   };
 
   const onNewNameChange = v => setNewNameVal(v);
 
-  const renderTree = useCallback((nodes, lvl) => nodes
-    .filter(n => showFiles || isFolder(n))
-    .map(n => (
-      <TreeItem
-        key={n.id}
-        item={n}
-        level={lvl}
-        allExpandedIds={expandedIds}
-        currentSelectedId={selectedId}
-        currentRenamingId={renamingId}
-        currentRenamingValue={renamingVal}
-        currentAddingUnderParentId={addingId}
-        currentNewFolderNameValue={newNameVal}
-        enableEditing={enableEditing}
-        showFiles={showFiles}
-        onToggleExpand={toggle}
-        onSelectNode={(id, it) => { setSelectedId(id); onNodeSelect?.(id, it); }}
-        onStartRename={startRename}
-        onCommitRename={commitRename}
-        onCancelAllEdits={cancelAll}
-        onTriggerAddSubfolder={triggerAdd}
-        onDeleteNode={deleteNode}
-        onNewFolderNameChange={onNewNameChange}
-        onCommitAddSubfolder={commitAdd}
-        renderRecursiveTreeFn={renderTree}
-      />
-    )), [
-      data, expandedIds, selectedId,
-      renamingId, renamingVal,
-      addingId, newNameVal,
-      enableEditing, showFiles,
-      toggle, cancelAll,
-      onNodeSelect, onNodeEditCommit,
-      onNodeDeleteCommit, onNodeAddCommit
-    ]);
+  const renderTree = useCallback((nodes, lvl) => nodes.map(n => (
+    <TreeItem
+      key={n.id}
+      item={n}
+      level={lvl}
+      allExpandedIds={expandedIds}
+      currentSelectedId={selectedId}
+      currentRenamingId={renamingId}
+      currentRenamingValue={renamingVal}
+      currentAddingUnderParentId={addingId}
+      currentNewFolderNameValue={newNameVal}
+      enableEditing={enableEditing}
+      onToggleExpand={toggle}
+      onSelectNode={(id) => { setSelectedId(id); onNodeSelect?.(id); }}
+      onStartRename={startRename}
+      onCommitRename={commitRename}
+      onCancelAllEdits={cancelAll}
+      onTriggerAddSubfolder={triggerAdd}
+      onDeleteNode={deleteNode}
+      onNewFolderNameChange={onNewNameChange}
+      onCommitAddSubfolder={commitAdd}
+      renderRecursiveTreeFn={renderTree}
+    />
+  )), [
+    expandedIds, selectedId,
+    renamingId, renamingVal,
+    addingId, newNameVal,
+    enableEditing, toggle, cancelAll,
+    onNodeSelect, onNodeEditCommit, onNodeDeleteCommit, onNodeAddCommit
+  ]);
 
   return (
     <div className={className}>
-      {/* NEW: Add-root-input at top */}
       {allowRootFolderAdd && enableEditing && (
-        <div className="flex items-center gap-1 py-1 pr-1 bg-accent/50 rounded mb-1"
-             style={{ paddingLeft:'0.5rem' }}>
+        <div className="flex items-center gap-1 py-1 pr-1 bg-accent/50 rounded mb-1" style={{ paddingLeft: '0.5rem' }}>
           <FolderPlus className="h-3 w-3 text-muted-foreground" />
           <Input
             value={newNameVal}

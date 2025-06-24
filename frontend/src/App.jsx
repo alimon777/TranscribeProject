@@ -1549,7 +1549,6 @@ const RepositoryPage = () => {
             onNodeEditCommit={handleRename}
             onNodeDeleteCommit={handleDelete}
             enableEditing={true}
-            showFiles={false}
             allowRootFolderAdd={true}
           />
         </aside>
@@ -1751,7 +1750,6 @@ export function IntegrationFolderDialog({
             onNodeEditCommit={handleRename}
             onNodeDeleteCommit={handleDelete}
             enableEditing={true}
-            showFiles={false}
             allowRootFolderAdd={true}
           />
         </div>

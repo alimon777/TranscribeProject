@@ -1,21 +1,9 @@
-// Is this item a “folder”?
-// In tree-utils.js
+// src/lib/tree-utils.js
+
 export const isFolder = (item) => {
   return item.type !== 'file' && (item.children !== undefined || item.parent_id !== undefined);
 };
 
-// Count files under a folder (recursive)
-export const countFilesRecursive = (folderItem) => {
-  if (!isFolder(folderItem) || !folderItem.children) return 0;
-  let count = 0;
-  for (const child of folderItem.children) {
-    if (isFolder(child)) count += countFilesRecursive(child);
-    else count++;
-  }
-  return count;
-};
-
-// Delete a node by id (recursive)
 export const deleteNodeRecursiveById = (nodes, targetId) => {
   const out = [];
   for (const node of nodes) {
@@ -29,7 +17,6 @@ export const deleteNodeRecursiveById = (nodes, targetId) => {
   return out;
 };
 
-// Rename a node by id (recursive)
 export const renameNodeRecursiveById = (nodes, targetId, newName) => {
   return nodes.map(node => {
     if (node.id === targetId) return { ...node, name: newName };
@@ -40,7 +27,6 @@ export const renameNodeRecursiveById = (nodes, targetId, newName) => {
   });
 };
 
-// Add a new node under parentId (null → root)
 export const addNodeRecursive = (nodes, parentId, newNodeData) => {
   if (parentId === null) {
     return [...nodes, newNodeData];
@@ -56,7 +42,6 @@ export const addNodeRecursive = (nodes, parentId, newNodeData) => {
   });
 };
 
-// Find a node by id (recursive)
 export const findNodeByIdRecursive = (nodes, targetId) => {
   for (const node of nodes) {
     if (node.id === targetId) return node;
@@ -68,7 +53,6 @@ export const findNodeByIdRecursive = (nodes, targetId) => {
   return null;
 };
 
-// Get the path (array of names) to a node
 export const getNodePath = (nodes, targetId, currentPath = []) => {
   for (const node of nodes) {
     const path = [...currentPath, node.name];
@@ -81,14 +65,12 @@ export const getNodePath = (nodes, targetId, currentPath = []) => {
   return null;
 };
 
-// Does this folder contain any sub‐folders?
 export const hasSubFolders = (folderItem) =>
   isFolder(folderItem) && folderItem.children.some(child => isFolder(child));
 
-// Convert a flat mockFolders[] → nested [{id,name,children},…]
 export const flatToNested = (folders) => {
   const map = new Map();
-  folders.forEach(f => map.set(f.id, { id: f.id, name: f.name, children: [] }));
+  folders.forEach(f => map.set(f.id, { id: f.id, name: f.name, parent_id: f.parent_id, count: f.count, children: [] }));
   const roots = [];
   folders.forEach(f => {
     const node = map.get(f.id);
