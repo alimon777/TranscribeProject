@@ -440,3 +440,59 @@ export const mockDeleteFolder = async (folderIdToDelete) => {
         }, MOCK_API_DELAY / 2);
     });
 };
+// … All of your existing mockData.js content up through your mockFinalizeIntegration(), mockCreateFolder(), mockEditFolderName(), mockDeleteFolder() …
+
+// ----------------------------------------------------------------
+// Below here we add our Tree-View API on top of the existing mocks
+// ----------------------------------------------------------------
+
+import { flatToNested } from './lib/tree-utils';
+
+// Returns the current folder tree as a nested [{ id, name, children: […] }, …]
+export function getFolderTreeData() {
+  return flatToNested(mockFolders);
+}
+
+export const treeApi = {
+  // Add a new folder under parentId (null → root)
+  addFolder: async (parentId, name, proposedId) => {
+    console.log(`TreeAPI.addFolder("${name}") under parent ${parentId}`);
+    await new Promise(r => setTimeout(r, 500));
+    if (name.toLowerCase().includes('fail')) {
+      return { success: false };
+    }
+    const finalId = `srv_${Date.now()}`;
+    mockFolders.push({
+      id: finalId,
+      name,
+      parent_id: parentId || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    return { success: true, finalId };
+  },
+
+  // Rename an existing folder
+  renameFolder: async (id, newName) => {
+    console.log(`TreeAPI.renameFolder(${id} → "${newName}")`);
+    await new Promise(r => setTimeout(r, 500));
+    const idx = mockFolders.findIndex(f => f.id === id);
+    if (idx < 0) return false;
+    mockFolders[idx].name = newName;
+    mockFolders[idx].updated_at = new Date().toISOString();
+    return true;
+  },
+
+  // Delete a folder (only if no sub‐folders exist)
+  deleteFolder: async (id) => {
+    console.log(`TreeAPI.deleteFolder(${id})`);
+    await new Promise(r => setTimeout(r, 500));
+    // Disallow delete if it has children
+    const hasChildren = mockFolders.some(f => f.parent_id === id);
+    if (hasChildren) return false;
+    const idx = mockFolders.findIndex(f => f.id === id);
+    if (idx < 0) return false;
+    mockFolders.splice(idx, 1);
+    return true;
+  }
+};
