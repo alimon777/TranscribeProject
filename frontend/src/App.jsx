@@ -28,6 +28,9 @@ import {
   Save,
   Download,
   Trash2,
+  Move,
+  Ellipsis,
+  SquareArrowOutUpRight,
 } from 'lucide-react';
 
 // Shadcn/ui components (assumed globally registered)
@@ -1180,36 +1183,6 @@ const TranscriptionPreview = ({
   return (
     <div className="w-80 space-y-3">
       {/* Action Buttons - Now outside the modal */}
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-4 w-4 mr-1" />
-          Delete
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={onMove}
-        >
-          <FileEdit className="h-4 w-4 mr-1" />
-          Move
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={onDownload}
-        >
-          <Download className="h-4 w-4 mr-1" />
-          Export
-        </Button>
-      </div>
-
       <Card className="h-fit">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
@@ -1225,7 +1198,7 @@ const TranscriptionPreview = ({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-6 w-6 -mt-1"
+              className="h-6 w-6 "
             >
               <XCircle className="h-4 w-4" />
             </Button>
@@ -1233,7 +1206,7 @@ const TranscriptionPreview = ({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 flex justify-between">
             <div className="text-xs">
               <span className="font-medium">Date Processed:</span>
               <div className="text-muted-foreground">
@@ -1259,8 +1232,8 @@ const TranscriptionPreview = ({
             </div>
           </div>
 
-          <div>
-            <div className="text-xs font-medium mb-1">Status</div>
+          <div className="flex gap-3 items-center">
+            <div className="text-xs font-medium mb-1">Status :</div>
             <StatusBadge status={transcription.status} />
           </div>
 
@@ -1270,16 +1243,42 @@ const TranscriptionPreview = ({
               {transcription.cleaned_transcript_text?.substring(0, 200)}...
             </div>
           </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={onExpand}
+            >
+              <SquareArrowOutUpRight className="h-4 w-4 mr-1" />
+              Preview
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={onMove}
+            >
+              <Move className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={onDownload}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={onExpand}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            Open in Editor
-          </Button>
         </CardContent>
       </Card>
     </div>
@@ -1296,124 +1295,64 @@ const TranscriptionExpandedPreview = ({
   isOpen,
   onClose,
 }) => {
+  if (!transcription) {
+    return null;
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col">
+      <DialogContent className="min-w-[90vw] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl">
-            {transcription.session_title}
+          <DialogTitle className="text-xl flex gap-3">
+            <span>
+              {transcription.session_title}
+            </span>
+            <StatusBadge status={transcription.status} />
           </DialogTitle>
-          <DialogDescription>
-            {folderName} • {transcription.source_file_name} • Processed on{' '}
-            {new Date(transcription.processed_at).toLocaleDateString()}
+          <DialogDescription className="flex">
+            <span>{folderName} • {transcription.source_file_name} • Processed on{" "} {new Date(transcription.processed_at).toLocaleDateString()} • </span>
+            <div className="ml-1">
+              {transcription.topics?.map((topic) => (
+                <Badge key={topic} variant="outline" className="text-xs mr-1 mb-1"> {/* Added mr-1 mb-1 for basic spacing */}
+                  {topic}
+                </Badge>
+              ))}
+            </div>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 grid grid-cols-5 gap-6 overflow-hidden">
-          {/* Content Area - Now takes up more space */}
-          <div className="col-span-4 flex flex-col">
-            <div className="flex-1 overflow-auto">
+        <div className="w-full overflow-hidden flex"> {/* Kept overflow and padding */}
+          {/* Content Area */}
+          <div className="w-full flex overflow-auto pr-1 gap-4"> {/* Kept overflow and padding */}
+            <div className="w-full">
+              <h3 className="pl-2 text-lg font-semibold mb-3">
+                Content
+              </h3>
               <div className="prose prose-sm max-w-none">
                 <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded">
                   {transcription.cleaned_transcript_text}
                 </pre>
               </div>
-              {transcription.quiz_content && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-3">
-                    Generated Quiz
-                  </h3>
-                  <div className="prose prose-sm max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded">
-                      {transcription.quiz_content}
-                    </pre>
-                  </div>
-                </div>
-              )}
             </div>
-          </div>
-
-          {/* Sidebar - Smaller and without action buttons */}
-          <div className="col-span-1 space-y-4 overflow-auto">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <div className="font-medium text-xs text-muted-foreground uppercase">
-                    Folder
-                  </div>
-                  <div>{folderName}</div>
+            {transcription.quiz_content && (
+              <div className="w-full">
+                <h3 className="pl-2 text-lg font-semibold mb-3">
+                  Generated Quiz
+                </h3>
+                <div className="prose prose-sm max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded">
+                    {transcription.quiz_content}
+                  </pre>
                 </div>
-                <div>
-                  <div className="font-medium text-xs text-muted-foreground uppercase">
-                    Purpose
-                  </div>
-                  <div>{transcription.session_purpose}</div>
-                </div>
-                <div>
-                  <div className="font-medium text-xs text-muted-foreground uppercase">
-                    Status
-                  </div>
-                  <StatusBadge status={transcription.status} />
-                </div>
-                <div>
-                  <div className="font-medium text-xs text-muted-foreground uppercase">
-                    Processing Time
-                  </div>
-                  <div>
-                    {Math.floor(transcription.processing_time_seconds / 60)}m{' '}
-                    {transcription.processing_time_seconds % 60}s
-                  </div>
-                </div>
-                <div>
-                  <div className="font-medium text-xs text-muted-foreground uppercase">
-                    Uploaded
-                  </div>
-                  <div>
-                    {new Date(transcription.uploaded_at).toLocaleDateString()}
-                  </div>
-                </div>
-                {transcription.integrated_at && (
-                  <div>
-                    <div className="font-medium text-xs text-muted-foreground uppercase">
-                      Integrated
-                    </div>
-                    <div>
-                      {new Date(transcription.integrated_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Topics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-1">
-                  {transcription.topics?.map((topic) => (
-                    <Badge key={topic} variant="outline" className="text-xs">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            )}
           </div>
         </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Close</Button>
-          </DialogClose>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
+
 
 /* ============================================
    Repository Page Component
@@ -1539,21 +1478,22 @@ const RepositoryPage = () => {
         </p>
       </div>
       <div className="flex flex-col lg:flex-row gap-6 items-start">
+
         {/* Sidebar: Folder Tree */}
-        <aside className="w-full lg:w-64 border rounded p-2 space-y-2 flex-shrink-0"> {/* Added flex-shrink-0 */}
-          <div className="flex justify-between items-center px-4 pt-3">
-            <h2 className="font-medium">Folders</h2>
+        <aside className="w-full lg:w-64 border rounded flex-shrink-0"> {/* Added flex-shrink-0 */}
+          <h2 className="font-medium py-4 pl-3">Transcription Directory</h2>
+          <div className="w-full border-t p-2">
+            <TreeView
+              data={treeData}
+              initialSelectedId={selectedFolder}
+              onNodeSelect={(id) => setSelectedFolder(id)}
+              onNodeAddCommit={handleAdd}
+              onNodeEditCommit={handleRename}
+              onNodeDeleteCommit={handleDelete}
+              enableEditing={true}
+              allowRootFolderAdd={true}
+            />
           </div>
-          <TreeView
-            data={treeData}
-            initialSelectedId={selectedFolder}
-            onNodeSelect={(id) => setSelectedFolder(id)}
-            onNodeAddCommit={handleAdd}
-            onNodeEditCommit={handleRename}
-            onNodeDeleteCommit={handleDelete}
-            enableEditing={true}
-            allowRootFolderAdd={true}
-          />
         </aside>
 
         {/* Main Content: Transcriptions Table and Preview */}
@@ -1568,7 +1508,7 @@ const RepositoryPage = () => {
             {/* Transcriptions Table */}
             {/* MODIFIED LINE BELOW */}
             <div className={`${selectedTranscription ? 'flex-1 min-w-0' : 'w-full'} transition-all duration-300`}>
-              <Card>
+              <Card className="pb-0">
                 <CardHeader>
                   <CardTitle>
                     Transcriptions in {getFolderName(selectedFolder)}
@@ -1580,7 +1520,7 @@ const RepositoryPage = () => {
                       No items found.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto"> {/* Added for table horizontal scroll if needed */}
+                    <div className="overflow-x-auto max-h-[350px]"> {/* Added for table horizontal scroll if needed */}
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1629,7 +1569,7 @@ const RepositoryPage = () => {
                               <TableCell>
                                 <StatusBadge status={t.status} />
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className="text-center">
                                 <Button
                                   variant="outline"
                                   size="xs"
@@ -1638,7 +1578,7 @@ const RepositoryPage = () => {
                                     setSelectedTranscription(t);
                                   }}
                                 >
-                                  <Eye className="h-4 w-4 mr-1" /> View
+                                  <Ellipsis className="h-4 w-4" />
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -1721,8 +1661,8 @@ export function IntegrationFolderDialog({
   const handleConfirm = () => {
     // compute path array by walking up the tree
     const getPathArray = (nodes, targetId) => {
-        const path = getNodePath(nodes, targetId);
-        return path ? path.map(p => p.name) : [];
+      const path = getNodePath(nodes, targetId);
+      return path ? path.map(p => p.name) : [];
     }
     const pathArray = selectedFolder ? getPathArray(treeData, selectedFolder) : [];
     onConfirm(selectedFolder, pathArray);
@@ -1974,11 +1914,11 @@ const AdminDashboardPage = () => {
                       <TableCell className="text-xs py-2.5 px-2">
                         <span
                           className={`py-0.5 px-1.5 rounded-full text-[10px] font-medium whitespace-nowrap ${c.status === 'Pending Review'
-                              ? 'bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300'
-                              : c.status &&
-                                c.status.startsWith('Resolved')
-                                ? 'bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300'
-                                : 'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300'
+                            ? 'bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300'
+                            : c.status &&
+                              c.status.startsWith('Resolved')
+                              ? 'bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300'
+                              : 'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300'
                             }`}
                         >
                           {c.status}
