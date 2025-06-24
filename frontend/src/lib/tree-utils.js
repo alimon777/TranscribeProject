@@ -1,6 +1,8 @@
 // Is this item a “folder”?
-export const isFolder = (item) =>
-  item && typeof item === 'object' && Array.isArray(item.children);
+// In tree-utils.js
+export const isFolder = (item) => {
+  return item.type !== 'file' && (item.children !== undefined || item.parent_id !== undefined);
+};
 
 // Count files under a folder (recursive)
 export const countFilesRecursive = (folderItem) => {

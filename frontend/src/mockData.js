@@ -51,12 +51,12 @@ export const SESSION_PURPOSES = [
   ];
   
   export let mockFolders = [ // Changed to let
-    { id: "all", name: "All Transcriptions", parent_id: null, created_at: "2023-01-01T00:00:00Z", updated_at: "2023-01-01T00:00:00Z" },
-    { id: "folder_proj", name: "Projects", parent_id: null, created_at: "2023-01-10T09:00:00Z", updated_at: "2023-01-10T09:00:00Z" },
-    { id: "folder_proj_phoenix", name: "Project Phoenix", parent_id: "folder_proj", created_at: "2023-01-10T09:01:00Z", updated_at: "2024-01-15T10:30:00Z" },
-    { id: "folder_proj_crm", name: "CRM Enhancement", parent_id: "folder_proj", created_at: "2023-01-10T09:02:00Z", updated_at: "2024-01-14T11:45:00Z" },
-    { id: "folder_meetings", name: "Meetings", parent_id: null, created_at: "2023-01-11T10:00:00Z", updated_at: "2024-01-13T14:20:00Z" },
-    { id: "folder_training", name: "Training Sessions", parent_id: null, created_at: "2023-01-12T11:00:00Z", updated_at: "2024-01-12T15:00:00Z" },
+    { id: "all", name: "All Transcriptions", parent_id: null, created_at: "2023-01-01T00:00:00Z",count:3 , updated_at: "2023-01-01T00:00:00Z" },
+    { id: "folder_proj", name: "Projects", parent_id: null, created_at: "2023-01-10T09:00:00Z",count:2 , updated_at: "2023-01-10T09:00:00Z" },
+    { id: "folder_proj_phoenix", name: "Project Phoenix", parent_id: "folder_proj", created_at: "2023-01-10T09:01:00Z",count:1 , updated_at: "2024-01-15T10:30:00Z" },
+    { id: "folder_proj_crm", name: "CRM Enhancement", parent_id: "folder_proj", created_at: "2023-01-10T09:02:00Z",count:1 , updated_at: "2024-01-14T11:45:00Z" },
+    { id: "folder_meetings", name: "Meetings", parent_id: null, created_at: "2023-01-11T10:00:00Z",count:1 , updated_at: "2024-01-13T14:20:00Z" },
+    { id: "folder_training", name: "Training Sessions", parent_id: null, created_at: "2023-01-12T11:00:00Z",count:0 , updated_at: "2024-01-12T15:00:00Z" },
   ];
   
   export let mockTranscriptions = [
@@ -448,11 +448,6 @@ export const mockDeleteFolder = async (folderIdToDelete) => {
 
 import { flatToNested } from './lib/tree-utils';
 
-// Returns the current folder tree as a nested [{ id, name, children: […] }, …]
-export function getFolderTreeData() {
-  return flatToNested(mockFolders);
-}
-
 export const treeApi = {
   // Add a new folder under parentId (null → root)
   addFolder: async (parentId, name, proposedId) => {
@@ -496,3 +491,19 @@ export const treeApi = {
     return true;
   }
 };
+const addCountToFolders = (folderNodes) => {
+  return folderNodes.map((folder) => {
+    // Use the direct count (if available) or default to 0
+    const count = folder.count ?? 0;
+    return {
+      ...folder,
+      count,
+      children: folder.children ? addCountToFolders(folder.children) : [],
+    };
+  });
+};
+
+export function getFolderTreeData() {
+  const nested = flatToNested(mockFolders);
+  return addCountToFolders(nested);
+}
