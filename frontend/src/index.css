@@ -13,13 +13,13 @@
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.9195 0.0253 196.7200);
   --secondary-foreground: oklch(0.4461 0.0263 256.8018);
-  --muted: oklch(0.9846 0.0017 247.8389);
+  --muted: oklch(0.9846 0.0017 247.8389); /* Used for scrollbar track */
   --muted-foreground: oklch(0.5510 0.0234 264.3637);
   --accent: oklch(0.9713 0.0419 196.4815);
   --accent-foreground: oklch(0.4620 0.0789 194.7689);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.9276 0.0058 264.5313);
+  --border: oklch(0.9276 0.0058 264.5313); /* Used for scrollbar thumb */
   --input: oklch(0.9276 0.0058 264.5313);
   --ring: oklch(0.6769 0.1155 194.7689);
   --chart-1: oklch(0.6769 0.1155 194.7689);
@@ -60,13 +60,13 @@
   --primary-foreground: oklch(1.0000 0 0);
   --secondary: oklch(0.5431 0.0927 194.7689);
   --secondary-foreground: oklch(0.9219 0 0);
-  --muted: oklch(0.2686 0 0);
+  --muted: oklch(0.2686 0 0); /* Used for scrollbar track - dark mode */
   --muted-foreground: oklch(0.7155 0 0);
   --accent: oklch(0.5431 0.0927 194.7689);
   --accent-foreground: oklch(0.9346 0.0252 196.7284);
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.3715 0 0);
+  --border: oklch(0.3715 0 0); /* Used for scrollbar thumb - dark mode */
   --input: oklch(0.3715 0 0);
   --ring: oklch(0.5431 0.0927 194.7689);
   --chart-1: oklch(0.5431 0.0927 194.7689);
@@ -152,7 +152,28 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+
+    /* Universal thin scrollbar styles for Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--muted); /* thumb track */
   }
+
+  /* Universal thin scrollbar styles for Webkit-based browsers */
+  *::-webkit-scrollbar {
+    width: 6px;  /* Width of vertical scrollbar */
+    height: 6px; /* Height of horizontal scrollbar */
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--muted);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 3px; /* Optional: roundness of the scroll thumb */
+    border: 1px solid var(--muted); /* Optional: creates a slight separation from the track */
+  }
+
   body {
     @apply bg-background text-foreground;
   }

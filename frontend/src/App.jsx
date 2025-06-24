@@ -183,7 +183,7 @@ export const useFolderOperations = (
         if (selectedFolder === id) setSelectedFolder(null);
         return true;
       }
-      alert(`Cannot delete "${name}" — it has subfolders.`);
+      alert(`Cannot delete "${name}" — it has subfolders or items.`); // Updated message based on treeApi logic
       return false;
     },
     [setTreeData, selectedFolder, setSelectedFolder]
@@ -701,13 +701,18 @@ const ReviewPage = ({ processedData, setProcessedDataForReview }) => {
     }
   };
 
-  const handleIntegrationFolderSelected = async (selectedFolder) => {
+  const handleIntegrationFolderSelected = async (selectedFolderId, selectedFolderPathArray) => { // pathArray added for consistency, though not directly used here
     setIsFolderModalOpen(false);
     setIsLoading(true);
     try {
+      // For mockFinalizeIntegration, we typically pass the folder object or its ID.
+      // Let's assume the mock API expects an object with at least `id` and `name`.
+      // We need to find the folder object from treeData if only ID is passed.
+      // However, IntegrationFolderDialog currently returns only ID.
+      // For simplicity, mockFinalizeIntegration might just need the ID.
       const result = await mockFinalizeIntegration(
         currentDataForBackend,
-        selectedFolder
+        { id: selectedFolderId, name: selectedFolderPathArray.pop() || 'Selected Folder' } // Construct a minimal folder object
       );
       alert(result.message);
       setProcessedDataForReview(null);
@@ -1309,11 +1314,11 @@ const TranscriptionExpandedPreview = ({
             </span>
             <StatusBadge status={transcription.status} />
           </DialogTitle>
-          <DialogDescription className="flex">
+          <DialogDescription className="flex flex-wrap"> {/* Added flex-wrap for better responsiveness of badges */}
             <span>{folderName} • {transcription.source_file_name} • Processed on{" "} {new Date(transcription.processed_at).toLocaleDateString()} • </span>
             <div className="ml-1">
               {transcription.topics?.map((topic) => (
-                <Badge key={topic} variant="outline" className="text-xs mr-1 mb-1"> {/* Added mr-1 mb-1 for basic spacing */}
+                <Badge key={topic} variant="outline" className="text-xs mr-1 mb-1">
                   {topic}
                 </Badge>
               ))}
@@ -1321,15 +1326,15 @@ const TranscriptionExpandedPreview = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="w-full overflow-hidden flex"> {/* Kept overflow and padding */}
+        <div className="w-full overflow-hidden flex flex-grow"> {/* Added flex-grow to allow content to use available space */}
           {/* Content Area */}
-          <div className="w-full flex overflow-auto pr-1 gap-4"> {/* Kept overflow and padding */}
+          <div className="w-full flex overflow-auto pr-1 gap-4 flex-grow"> {/* Added flex-grow */}
             <div className="w-full">
               <h3 className="pl-2 text-lg font-semibold mb-3">
                 Content
               </h3>
-              <div className="prose prose-sm max-w-none">
-                <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded">
+              <div className="prose prose-sm max-w-none h-[calc(100%-40px)] overflow-y-auto"> {/* Calculated height for scroll */}
+                <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded h-full">
                   {transcription.cleaned_transcript_text}
                 </pre>
               </div>
@@ -1339,8 +1344,8 @@ const TranscriptionExpandedPreview = ({
                 <h3 className="pl-2 text-lg font-semibold mb-3">
                   Generated Quiz
                 </h3>
-                <div className="prose prose-sm max-w-none">
-                  <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded">
+                <div className="prose prose-sm max-w-none h-[calc(100%-40px)] overflow-y-auto"> {/* Calculated height for scroll */}
+                  <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 p-4 rounded h-full">
                     {transcription.quiz_content}
                   </pre>
                 </div>
@@ -1353,6 +1358,42 @@ const TranscriptionExpandedPreview = ({
   );
 };
 
+// Helper function to get all descendant folder IDs including the starting folder itself
+const getAllDescendantFolderIds = (nodes, targetId) => {
+  const resultIds = new Set();
+  if (!Array.isArray(nodes) || nodes.length === 0 || !targetId) {
+    return Array.from(resultIds);
+  }
+
+  const findStartNode = (currentNodes, id) => {
+    for (const node of currentNodes) {
+      if (node.id === id) return node;
+      if (node.children && Array.isArray(node.children)) {
+        const found = findStartNode(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const startNode = findStartNode(nodes, targetId);
+  const q = []; 
+
+  if (startNode) {
+    q.push(startNode);
+  }
+
+  while (q.length > 0) {
+    const current = q.shift();
+    resultIds.add(current.id); 
+
+    if (current.children && Array.isArray(current.children)) {
+      current.children.forEach(childNode => q.push(childNode));
+    }
+  }
+  return Array.from(resultIds);
+};
+
 
 /* ============================================
    Repository Page Component
@@ -1360,7 +1401,7 @@ const TranscriptionExpandedPreview = ({
 ============================================ */
 const RepositoryPage = () => {
   const [treeData, setTreeData] = useState([]);
-  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [selectedFolder, setSelectedFolder] = useState('all'); // MODIFIED: Default to 'all'
   const [transcriptions, setTranscriptions] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedTranscription, setSelectedTranscription] = useState(null);
@@ -1386,19 +1427,33 @@ const RepositoryPage = () => {
     reload();
   }, [reload]);
 
-  // Filter transcriptions by folder and search term
-  const list = transcriptions
-    .filter(
-      (t) =>
-        !selectedFolder ||
-        selectedFolder === 'all' ||
-        t.folder_id === selectedFolder
-    )
-    .filter(
-      (t) =>
-        !search ||
-        t.session_title.toLowerCase().includes(search.toLowerCase())
-    );
+  // Filter transcriptions by folder (recursively) and search term
+  const list = useMemo(() => {
+    let effectiveFolderIds = null; // null means all items (for 'all' selection)
+
+    if (selectedFolder && selectedFolder !== 'all' && treeData.length > 0) {
+      effectiveFolderIds = getAllDescendantFolderIds(treeData, selectedFolder);
+    }
+
+    return transcriptions
+      .filter(t => {
+        if (effectiveFolderIds === null) { // This handles selectedFolder === 'all'
+          return true;
+        }
+        // If a specific folder (and its children) are selected, filter by those IDs.
+        // If effectiveFolderIds is an empty array (e.g., folder not found or folder has no items and no self-items),
+        // then this will correctly filter out all items.
+        return effectiveFolderIds.includes(t.folder_id);
+      })
+      .filter(
+        (t) =>
+          !search ||
+          t.session_title.toLowerCase().includes(search.toLowerCase()) ||
+          (t.topics && t.topics.some(topic => topic.toLowerCase().includes(search.toLowerCase()))) || // Search topics
+          (t.cleaned_transcript_text && t.cleaned_transcript_text.toLowerCase().includes(search.toLowerCase())) // Search content
+      );
+  }, [transcriptions, selectedFolder, treeData, search]);
+
 
   // Get folder name from treeData
   const getFolderName = (folderId) => {
@@ -1428,9 +1483,9 @@ const RepositoryPage = () => {
       )
     );
     alert(
-      `Transcription moved to folder: ${pathArray.join(
+      `Transcription "${selectedTranscription.session_title}" moved to folder: ${pathArray.join(
         ' / '
-      )}. Please refresh if needed.`
+      )}. (Mock behavior, refresh may be needed for persistent storage)`
     );
     setSelectedTranscription(null);
     setMoveModalOpen(false); // Close modal after move
@@ -1447,7 +1502,10 @@ const RepositoryPage = () => {
       setTranscriptions((prev) =>
         prev.filter((t) => t.id !== selectedTranscription.id)
       );
+      // Mock API call for deletion could be added here
+      // await mockDeleteTranscription(selectedTranscription.id);
       setSelectedTranscription(null);
+       alert(`Transcription "${selectedTranscription.session_title}" deleted. (Mock behavior)`);
     }
   };
 
@@ -1455,12 +1513,12 @@ const RepositoryPage = () => {
   const handleDownloadTranscription = () => {
     if (!selectedTranscription) return;
     // Create a simple text file download
-    const content = `Title: ${selectedTranscription.session_title}\n\nTranscription:\n${selectedTranscription.cleaned_transcript_text}`;
-    const blob = new Blob([content], { type: 'text/plain' });
+    const content = `Title: ${selectedTranscription.session_title}\n\nPurpose: ${selectedTranscription.session_purpose}\nProcessed: ${new Date(selectedTranscription.processed_at).toLocaleString()}\n\nTopics: ${(selectedTranscription.topics || []).join(', ')}\n\nTranscription:\n${selectedTranscription.cleaned_transcript_text}\n\n${selectedTranscription.quiz_content ? 'Quiz:\n' + selectedTranscription.quiz_content : ''}`;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${selectedTranscription.session_title}.txt`;
+    a.download = `${selectedTranscription.session_title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1480,13 +1538,16 @@ const RepositoryPage = () => {
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Sidebar: Folder Tree */}
-        <aside className="w-full lg:w-64 border rounded flex-shrink-0"> {/* Added flex-shrink-0 */}
+        <aside className="w-full lg:w-64 border rounded flex-shrink-0">
           <h2 className="font-medium py-4 pl-3">Transcription Directory</h2>
           <div className="w-full border-t p-2">
             <TreeView
               data={treeData}
-              initialSelectedId={selectedFolder}
-              onNodeSelect={(id) => setSelectedFolder(id)}
+              initialSelectedId={selectedFolder} // Reflects default 'all'
+              onNodeSelect={(id) => {
+                setSelectedFolder(id);
+                setSelectedTranscription(null); // Deselect transcription when folder changes
+              }}
               onNodeAddCommit={handleAdd}
               onNodeEditCommit={handleRename}
               onNodeDeleteCommit={handleDelete}
@@ -1497,21 +1558,20 @@ const RepositoryPage = () => {
         </aside>
 
         {/* Main Content: Transcriptions Table and Preview */}
-        <section className="flex-1 space-y-4 min-w-0"> {/* Added min-w-0 */}
+        <section className="flex-1 space-y-4 min-w-0">
           <Input
-            placeholder="Search transcriptions…"
+            placeholder="Search transcriptions by title, topic or content..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <div className="flex gap-6">
+          <div className="flex gap-6"> {/* This div handles table and preview layout */}
             {/* Transcriptions Table */}
-            {/* MODIFIED LINE BELOW */}
             <div className={`${selectedTranscription ? 'flex-1 min-w-0' : 'w-full'} transition-all duration-300`}>
               <Card className="pb-0">
                 <CardHeader>
                   <CardTitle>
-                    Transcriptions in {getFolderName(selectedFolder)}
+                    Transcriptions in "{getFolderName(selectedFolder)}"
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1520,16 +1580,16 @@ const RepositoryPage = () => {
                       No items found.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto max-h-[350px]"> {/* Added for table horizontal scroll if needed */}
+                    <div className="overflow-x-auto max-h-[345px]"> {/* Added for table horizontal scroll if needed */}
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 bg-card z-10">
                           <TableRow>
                             <TableHead>Title</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Purpose</TableHead>
                             <TableHead>Topics</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="text-center">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1541,19 +1601,19 @@ const RepositoryPage = () => {
                               onClick={() => setSelectedTranscription(t)}
                             >
                               <TableCell>
-                                <div className="font-medium">{t.session_title}</div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="font-medium max-w-xs truncate" title={t.session_title}>{t.session_title}</div>
+                                <div className="text-xs text-muted-foreground max-w-xs truncate" title={t.source_file_name}>
                                   {t.source_file_name}
                                 </div>
                               </TableCell>
                               <TableCell>
                                 {new Date(t.processed_at).toLocaleDateString()}
                               </TableCell>
-                              <TableCell className="text-sm">
+                              <TableCell className="text-sm max-w-[150px] truncate" title={t.session_purpose}>
                                 {t.session_purpose}
                               </TableCell>
                               <TableCell>
-                                <div className="flex flex-wrap gap-1">
+                                <div className="flex flex-wrap gap-1 max-w-[200px]">
                                   {t.topics?.slice(0, 2).map((topic) => (
                                     <Badge key={topic} variant="outline" className="text-xs">
                                       {topic}
@@ -1571,11 +1631,11 @@ const RepositoryPage = () => {
                               </TableCell>
                               <TableCell className="text-center">
                                 <Button
-                                  variant="outline"
-                                  size="xs"
+                                  variant="ghost" // Changed to ghost for less visual clutter
+                                  size="icon_xs" // Made icon smaller
                                   onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedTranscription(t);
+                                    e.stopPropagation(); // Prevent row click
+                                    setSelectedTranscription(t); // Ensure it's selected for actions panel
                                   }}
                                 >
                                   <Ellipsis className="h-4 w-4" />
@@ -1591,7 +1651,7 @@ const RepositoryPage = () => {
               </Card>
             </div>
 
-            {/* Preview Panel */}
+            {/* Preview Panel (appears on the right of the table) */}
             {selectedTranscription && (
               <TranscriptionPreview
                 transcription={selectedTranscription}
@@ -1618,11 +1678,12 @@ const RepositoryPage = () => {
       )}
 
       {/* Move-to Modal using IntegrationFolderDialog for moving */}
-      {moveModalOpen && selectedTranscription && ( /* Ensure selectedTranscription exists for move modal */
+      {moveModalOpen && selectedTranscription && (
         <IntegrationFolderDialog
           isOpen={moveModalOpen}
           onClose={() => setMoveModalOpen(false)}
-          onConfirm={handleMoveTranscription}
+          onConfirm={handleMoveTranscription} // Passes (targetFolderId, pathArray)
+          // suggestedPath can be omitted or set to current folder path if desired
         />
       )}
     </div>
@@ -1640,32 +1701,34 @@ export function IntegrationFolderDialog({
   onConfirm,
 }) {
   const [treeData, setTreeData] = useState([]);
-  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [selectedFolderId, setSelectedFolderId] = useState(null); // Renamed for clarity
 
   // Use the common folder operations hook (editing enabled here)
   const { handleAdd, handleRename, handleDelete } = useFolderOperations(
     treeData,
     setTreeData,
-    selectedFolder,
-    setSelectedFolder
+    selectedFolderId, // Pass the ID state
+    setSelectedFolderId // Pass the setter for ID state
   );
 
   // load tree on open
   useEffect(() => {
     if (isOpen) {
       setTreeData(getFolderTreeData());
-      setSelectedFolder(null); // Reset selection when dialog opens
+      setSelectedFolderId(null); // Reset selection when dialog opens
     }
   }, [isOpen]);
 
   const handleConfirm = () => {
+    if (!selectedFolderId) return; // Ensure a folder is selected
+
     // compute path array by walking up the tree
     const getPathArray = (nodes, targetId) => {
-      const path = getNodePath(nodes, targetId);
+      const path = getNodePath(nodes, targetId); // getNodePath is from tree-utils
       return path ? path.map(p => p.name) : [];
     }
-    const pathArray = selectedFolder ? getPathArray(treeData, selectedFolder) : [];
-    onConfirm(selectedFolder, pathArray);
+    const pathArray = selectedFolderId ? getPathArray(treeData, selectedFolderId) : [];
+    onConfirm(selectedFolderId, pathArray); // Pass ID and pathArray
     onClose();
   };
 
@@ -1676,7 +1739,7 @@ export function IntegrationFolderDialog({
           <DialogTitle>Select Folder</DialogTitle>
           <DialogDescription>
             {suggestedPath && suggestedPath.length > 0 && `Suggested path: ${suggestedPath.join(' / ')}`}
-            {!suggestedPath || suggestedPath.length === 0 && `No specific path suggested.`}
+            {(!suggestedPath || suggestedPath.length === 0) && `No specific path suggested.`}
             <br />
             Click a folder or create a new one, then confirm.
           </DialogDescription>
@@ -1685,8 +1748,8 @@ export function IntegrationFolderDialog({
         <div className="h-64 overflow-auto border rounded p-2 mb-4">
           <TreeView
             data={treeData}
-            initialSelectedId={selectedFolder}
-            onNodeSelect={(id) => setSelectedFolder(id)}
+            initialSelectedId={selectedFolderId}
+            onNodeSelect={(id) => setSelectedFolderId(id)}
             onNodeAddCommit={handleAdd}
             onNodeEditCommit={handleRename}
             onNodeDeleteCommit={handleDelete}
@@ -1699,7 +1762,7 @@ export function IntegrationFolderDialog({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleConfirm} disabled={!selectedFolder}>
+          <Button onClick={handleConfirm} disabled={!selectedFolderId}>
             Confirm
           </Button>
         </DialogFooter>
@@ -1718,7 +1781,7 @@ export default function App() {
     <Router>
       <TooltipProvider>
         <AppBar />
-        <main className="p-4">
+        <main className="pt-4 px-4 pb-8 md:pt-6 md:px-6 md:pb-12"> {/* Adjusted main padding */}
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route

@@ -51,12 +51,12 @@ export let mockTopics = [
 
 export let mockFolders = [
   // Note: we include a direct "count" key here for each folder.
-  { id: "all", name: "All Transcriptions", parent_id: null, created_at: "2023-01-01T00:00:00Z", updated_at: "2023-01-01T00:00:00Z", count: 3 },
+  { id: "all", name: "All Transcriptions", parent_id: null, created_at: "2023-01-01T00:00:00Z", updated_at: "2023-01-01T00:00:00Z", count: 4 },
   { id: "folder_proj", name: "Projects", parent_id: null, created_at: "2023-01-10T09:00:00Z", updated_at: "2023-01-10T09:00:00Z", count: 2 },
   { id: "folder_proj_phoenix", name: "Project Phoenix", parent_id: "folder_proj", created_at: "2023-01-10T09:01:00Z", updated_at: "2024-01-15T10:30:00Z", count: 1 },
   { id: "folder_proj_crm", name: "CRM Enhancement", parent_id: "folder_proj", created_at: "2023-01-10T09:02:00Z", updated_at: "2024-01-14T11:45:00Z", count: 1 },
   { id: "folder_meetings", name: "Meetings", parent_id: null, created_at: "2023-01-11T10:00:00Z", updated_at: "2024-01-13T14:20:00Z", count: 1 },
-  { id: "folder_training", name: "Training Sessions", parent_id: null, created_at: "2023-01-12T11:00:00Z", updated_at: "2024-01-12T15:00:00Z", count: 0 },
+  { id: "folder_training", name: "Training Sessions", parent_id: null, created_at: "2023-01-12T11:00:00Z", updated_at: "2024-01-12T15:00:00Z", count: 1 },
 ];
 
 export let mockTranscriptions = [
