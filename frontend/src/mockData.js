@@ -413,6 +413,42 @@ export const mockDeleteFolder = async (folderIdToDelete) => {
   });
 };
 
+
+// --- New APIs for individual conflict handling ---
+export const mockFetchConflictDetail = (conflictId) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const c = mockAdminConflicts.find((cf) => cf.id === conflictId);
+      if (!c) return resolve(null);
+      // Build detail: left = existing KB doc, right = new transcription
+      resolve({
+        id: c.id,
+        status: c.status,
+        pathLeft: [`KB Document`, c.existing_kb_document_id],
+        pathRight: [`Transcription`, c.new_transcription_title],
+        existingContent: c.existing_content_snippet,
+        incomingContent: c.new_content_snippet,
+        resolutionNotes: c.resolution_notes || '',
+      });
+    }, MOCK_API_DELAY / 2);
+  });
+};
+
+export const mockResolveConflict = (conflictId, chosenContent) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const idx = mockAdminConflicts.findIndex((cf) => cf.id === conflictId);
+      if (idx > -1) {
+        mockAdminConflicts[idx].status = CONFLICT_STATUSES.RESOLVED_MERGED;
+        mockAdminConflicts[idx].resolution_notes = chosenContent;
+        mockAdminConflicts[idx].resolved_at = new Date().toISOString();
+      }
+      resolve({ success: true });
+    }, MOCK_API_DELAY / 2);
+  });
+};
+
+
 // ----------------------------------------------------------------
 // Tree-View API built on top of the existing mocks
 // ----------------------------------------------------------------
