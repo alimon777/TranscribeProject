@@ -73,7 +73,7 @@ export default function UploadPage({ setProcessedDataForReview }) {
     };
 
     return (
-        <div className="p-4 md:p-6 w-full mb-6">
+        <div className="p-4 md:p-6 w-full">
             <div className="mb-6 text-left pl-3 pb-2">
                 <h1 className="text-3xl font-semibold mb-1">Upload & Process Content</h1>
                 <p className="text-md text-muted-foreground">
