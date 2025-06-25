@@ -89,7 +89,7 @@ export default function ReviewPage({ processedData, setProcessedDataForReview })
 
     return (
         <div className="p-4 md:p-6 w-full">
-            <div className="mb-6 text-center">
+            <div className="mb-6">
                 <h1 className="text-3xl font-semibold mb-1">
                     Review & Edit Generated Content
                 </h1>
@@ -99,8 +99,7 @@ export default function ReviewPage({ processedData, setProcessedDataForReview })
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <div className="lg:col-span-3 space-y-6">
-                    <div className="flex items-center bg-green-50 border-l-4 border-green-500 p-4 rounded">
-                        <CheckCircle className="h-5 w-5 text-green-700" />
+                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 text-green-700 dark:text-green-300 p-4 rounded-md shadow-sm">                        <CheckCircle className="h-5 w-5 text-green-700" />
                         <p className="ml-2 text-sm text-green-700">
                             Content processing completed successfully.
                         </p>
@@ -159,7 +158,7 @@ export default function ReviewPage({ processedData, setProcessedDataForReview })
                             <CardTitle>Knowledge Base Integration</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded text-xs text-yellow-700">
+                            <div className="flex items-start gap-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 text-yellow-700 dark:text-yellow-300 p-3 rounded-md text-xs mb-3">
                                 {knowledgeBaseIntegration.suggestionText}
                             </div>
                             <div className="mt-2">

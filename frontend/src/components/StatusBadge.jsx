@@ -18,13 +18,13 @@ export default function StatusBadge ({ status }) {
       return (
         <Badge
           variant="default"
-          className="bg-green-500 hover:bg-green-600"
+          className="text-green-600 border-green-500 bg-green-50 dark:bg-green-900/30"
         >
           Integrated
         </Badge>
       );
     case TRANSCRIPTION_STATUSES.ARCHIVED:
-      return <Badge variant="secondary">Archived</Badge>;
+      return <Badge variant="secondary" className="text-purple-600 border-purple-500 bg-purple-50 dark:bg-purple-900/30">Archived</Badge>;
     case TRANSCRIPTION_STATUSES.PROCESSING:
       return (
         <Badge
