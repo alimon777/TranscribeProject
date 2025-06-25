@@ -88,7 +88,7 @@ const TreeItem = React.memo(({
   return (
     <li role="treeitem" aria-expanded={canToggle ? isExpanded : undefined} aria-selected={isSelected} className="list-none">
       <div
-        className={cn("flex items-center gap-1 py-1 pr-1 rounded group", {
+        className={cn("flex items-center gap-1 py-1 pr-1 rounded group mb-0.5", {
           "hover:bg-accent": !isRenaming,
           "bg-accent": isSelected
         })}
@@ -134,7 +134,7 @@ const TreeItem = React.memo(({
         )}
 
         {enableEditing && isFolderItem && !isRenaming && (
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => open && onSelectNode?.(item.id)}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
                 <MoreHorizontal className="h-3 w-3" />
@@ -303,8 +303,8 @@ export const TreeView = ({
   return (
     <div className={className}>
       {allowRootFolderAdd && enableEditing && (
-        <div className="flex items-center gap-1 py-1 pr-1 bg-accent/50 rounded mb-1" style={{ paddingLeft: '0.5rem' }}>
-          <FolderPlus className="h-3 w-3 text-muted-foreground" />
+        <div className="flex items-center gap-1 py-1 pr-1 rounded mb-1" style={{ paddingLeft: '0.5rem' }}>
+          <FolderPlus className="h-3 w-3 text-muted-foreground mr-2" />
           <Input
             value={newNameVal}
             placeholder="New root folder…"
