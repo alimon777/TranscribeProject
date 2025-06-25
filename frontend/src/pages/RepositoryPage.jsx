@@ -231,7 +231,7 @@ export default function RepositoryPage() {
       {/* main flex container: stacks on mobile, row on md+ */}
       <div className="flex flex-col md:flex-row gap-6">
         {/* sidebar */}
-        <aside className="w-full md:w-64 border rounded p-2">
+        <aside className="w-full md:w-64 border rounded p-2 flex-shrink-0"> {/* Added flex-shrink-0 for robustness */}
           <h2 className="font-medium py-2 ml-3 mb-2">Directory</h2>
           <TreeView
             data={treeData}
@@ -249,7 +249,8 @@ export default function RepositoryPage() {
         </aside>
 
         {/* main section */}
-        <section className="flex-1 space-y-4">
+        {/* Added min-w-0 here to allow this flex item to shrink */}
+        <section className="flex-1 space-y-4 min-w-0">
           <div className="flex gap-2 items-center">
             <Input
               placeholder="Search by title, topic or content..."
@@ -340,8 +341,9 @@ export default function RepositoryPage() {
           {/* list + preview: stack on mobile, row on md+ */}
           <div className="flex flex-col md:flex-row gap-6">
             {/* list pane */}
+            {/* Added md:min-w-0 here to allow this flex item to shrink on md+ screens */}
             <div
-              className={`w-full md:flex-1 transition-all duration-300`}
+              className={`w-full md:flex-1 md:min-w-0 transition-all duration-300`}
             >
               <Card>
                 <CardHeader>
@@ -456,7 +458,8 @@ export default function RepositoryPage() {
 
             {/* preview pane */}
             {selectedTranscription && (
-              <div className="w-full md:w-1/3">
+              // Added flex-shrink-0 for robustness, ensuring it tries to maintain its width
+              <div className="w-full md:w-1/3 flex-shrink-0"> 
                 <TranscriptionPreview
                   transcription={selectedTranscription}
                   folderName={getFolderName(
