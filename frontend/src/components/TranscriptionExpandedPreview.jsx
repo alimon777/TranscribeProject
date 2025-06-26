@@ -17,12 +17,11 @@ export default function TranscriptionExpandedPreview({
         <DialogHeader>
           <DialogTitle className="text-xl flex gap-3">
             <span>{transcription.session_title}</span>
-            <StatusBadge status={transcription.status} />
           </DialogTitle>
           <DialogDescription className="flex flex-wrap">
             <span>
               {folderName} • {transcription.source_file_name} • Processed on{' '}
-              {new Date(transcription.processed_at).toLocaleDateString()} •{' '}
+              {new Date(transcription.integrated_at).toLocaleDateString()} •{' '}
             </span>
             <div className="ml-1 flex flex-wrap gap-1">
               {transcription.topics?.map((topic) => (

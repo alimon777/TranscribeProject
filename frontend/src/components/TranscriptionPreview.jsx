@@ -47,9 +47,9 @@ export default function TranscriptionPreview({
         <CardContent className="space-y-4">
           <div className="space-y-2 flex justify-between">
             <div className="text-xs">
-              <span className="font-medium">Date Processed:</span>
+              <span className="font-medium">Integrated On:</span>
               <div className="text-muted-foreground">
-                {new Date(transcription.processed_at).toLocaleDateString()}
+                {new Date(transcription.integrated_at).toLocaleDateString()}
               </div>
             </div>
             <div className="text-xs">
@@ -62,16 +62,12 @@ export default function TranscriptionPreview({
           <div>
             <div className="text-xs font-medium mb-2">Key Topics</div>
             <div className="flex flex-wrap gap-1">
-              {transcription.topics?.map((topic) => (
+              {transcription.topic_names?.map((topic) => (
                 <Badge key={topic} variant="outline" className="text-xs">
                   {topic}
                 </Badge>
               ))}
             </div>
-          </div>
-          <div className="flex gap-3 items-center">
-            <div className="text-xs font-medium mb-1">Status :</div>
-            <StatusBadge status={transcription.status} />
           </div>
           <div>
             <div className="text-xs font-medium mb-2">Content</div>

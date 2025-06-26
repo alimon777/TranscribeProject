@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardHeader,
@@ -16,19 +16,34 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle, XCircle, ListFilter, Ellipsis } from 'lucide-react';
-import {
-  mockFetchAdminConflicts,
-  mockFetchConflictDetail,
-  mockResolveConflict,
-  ANOMALY_TYPES,
-  CONFLICT_STATUSES,
-} from '../mockData';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
+import {
+  getAdminConflicts, // Renamed in backend: get_admin_conflicts_endpoint
+  getConflictDetail,
+  resolveConflict,
+} from '../apiClient'; // Adjust path if needed
+
+// Define string constants based on backend enums (values must match backend)
+const LOCAL_ANOMALY_TYPES = {
+  SEMANTIC_DIFFERENCE: "Semantic Difference",
+  OVERLAP: "Significant Overlap",
+  CONTRADICTION: "Contradiction",
+  OUTDATED_INFO: "Outdated Information",
+};
+
+const LOCAL_CONFLICT_STATUSES = {
+  PENDING: "Pending Review",
+  RESOLVED_MERGED: "Resolved (Merged)",
+  REJECTED: "Rejected",
+};
+
+
 export default function AdminDashboardPage() {
   const [conflicts, setConflicts] = useState([]);
+  const [apiStats, setApiStats] = useState({ pending: 0, resolved: 0, rejected: 0, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   // for detail modal
@@ -39,58 +54,84 @@ export default function AdminDashboardPage() {
   const [isResolving, setIsResolving] = useState(false);
 
   useEffect(() => {
-    mockFetchAdminConflicts().then((data) => {
-      setConflicts(data);
-      setIsLoading(false);
-    });
-  }, []);
-
-  const stats = useMemo(() => {
-    if (isLoading) return {};
-    return {
-      pending: conflicts.filter((c) => c.status === CONFLICT_STATUSES.PENDING).length,
-      resolved: conflicts.filter((c) => c.status.startsWith('Resolved')).length,
-      rejected: conflicts.filter((c) => c.status.startsWith('Rejected')).length,
-      total: conflicts.length,
-    };
-  }, [conflicts, isLoading]);
+    // console.log("AdminDashboardPage useEffect running"); // For debugging StrictMode
+    setIsLoading(true);
+    getAdminConflicts() // This function name in apiClient.js maps to /admin/conflicts GET
+      .then((data) => { 
+        setConflicts(data.conflicts || []); 
+        setApiStats(data.stats || { pending: 0, resolved: 0, rejected: 0, total: 0 });
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error('Failed to fetch admin conflicts:', error);
+        setConflicts([]);
+        setApiStats({ pending: 0, resolved: 0, rejected: 0, total: 0 });
+        setIsLoading(false);
+      });
+  }, []); // Empty dependency array means this runs once on mount (or twice in StrictMode dev)
 
   const cards = [
-    { title: 'Pending Review', value: stats.pending, Icon: AlertTriangle, color: 'text-yellow-500' },
-    { title: 'Resolved', value: stats.resolved, Icon: CheckCircle, color: 'text-green-500' },
-    { title: 'Rejected', value: stats.rejected, Icon: XCircle, color: 'text-red-500' },
-    { title: 'Total Items', value: stats.total, Icon: ListFilter, color: 'text-primary' },
+    { title: 'Pending Review', value: apiStats.pending, Icon: AlertTriangle, color: 'text-yellow-500' },
+    { title: 'Resolved', value: apiStats.resolved, Icon: CheckCircle, color: 'text-green-500' },
+    { title: 'Rejected', value: apiStats.rejected, Icon: XCircle, color: 'text-red-500' },
+    { title: 'Total Items', value: apiStats.total, Icon: ListFilter, color: 'text-primary' },
   ];
 
-  // open detail modal
   const openConflict = (id) => {
     setIsDetailLoading(true);
     setIsModalOpen(true);
-    mockFetchConflictDetail(id).then((d) => {
-      setDetail(d);
-      setChosenContent(d?.resolutionNotes || '');
-      setIsDetailLoading(false);
-    });
+    setDetail(null);
+    setChosenContent('');
+
+    getConflictDetail(id)
+      .then((data) => {
+        setDetail(data);
+        setChosenContent(data?.resolution_content || '');
+        setIsDetailLoading(false);
+      })
+      .catch((error) => {
+        console.error(`Failed to fetch conflict detail for ID ${id}:`, error);
+        setIsDetailLoading(false);
+      });
   };
 
   const handleResolve = () => {
     if (!detail) return;
     setIsResolving(true);
-    mockResolveConflict(detail.id, chosenContent).then(() => {
-      // update local list
-      setConflicts((prev) =>
-        prev.map((c) =>
-          c.id === detail.id
-            ? { ...c, status: CONFLICT_STATUSES.RESOLVED_MERGED }
-            : c
-        )
-      );
-      setIsResolving(false);
-      setIsModalOpen(false);
-    });
+
+    const payload = {
+      resolution_content: chosenContent,
+      status: LOCAL_CONFLICT_STATUSES.RESOLVED_MERGED 
+    };
+
+    resolveConflict(detail.id, payload)
+      .then((response) => { // API now returns { resolved_conflict: {}, updated_stats: {} }
+        const resolvedConflictData = response.resolved_conflict;
+        const newStats = response.updated_stats;
+
+        setConflicts((prev) =>
+          prev.map((c) =>
+            c.id === resolvedConflictData.id // Use ID from resolved_conflict
+              ? { ...c, status: resolvedConflictData.status, resolution_content: resolvedConflictData.resolution_content } 
+              : c
+          )
+        );
+        
+        // Update stats directly from the resolveConflict response
+        setApiStats(newStats || { pending: 0, resolved: 0, rejected: 0, total: 0 });
+
+        setIsResolving(false);
+        setIsModalOpen(false);
+        setDetail(null);
+      })
+      .catch((error) => {
+        console.error(`Failed to resolve conflict ID ${detail.id}:`, error);
+        setIsResolving(false);
+      });
   };
 
-  if (isLoading) {
+  // ... (rest of the component JSX remains the same)
+  if (isLoading && conflicts.length === 0) { 
     return (
       <div className="p-8">
         <Skeleton className="h-6 w-1/3 mb-4" />
@@ -144,17 +185,19 @@ export default function AdminDashboardPage() {
                 <TableBody>
                   {conflicts.map((c) => {
                     let anomalyClass = 'text-[10px] py-0.5 px-1.5 rounded-full ';
-                    if (c.anomaly_type === ANOMALY_TYPES.SEMANTIC_DIFFERENCE)
+                    if (c.anomaly_type === LOCAL_ANOMALY_TYPES.SEMANTIC_DIFFERENCE)
                       anomalyClass += 'bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300';
-                    else if (c.anomaly_type === ANOMALY_TYPES.OVERLAP)
+                    else if (c.anomaly_type === LOCAL_ANOMALY_TYPES.OVERLAP)
                       anomalyClass += 'bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300';
                     else anomalyClass += 'bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300';
 
                     let statusClass = 'py-0.5 px-1.5 rounded-full text-[10px] ';
-                    if (c.status === CONFLICT_STATUSES.PENDING)
+                    if (c.status === LOCAL_CONFLICT_STATUSES.PENDING)
                       statusClass += 'bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300';
-                    else if (c.status.startsWith('Resolved'))
+                    else if (c.status && c.status.startsWith('Resolved'))
                       statusClass += 'bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300';
+                    else if (c.status && c.status.startsWith('Rejected'))
+                       statusClass += 'bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300';
                     else statusClass += 'bg-gray-100 text-gray-600';
 
                     return (
@@ -170,7 +213,7 @@ export default function AdminDashboardPage() {
                           </div>
                         </TableCell>
                         <TableCell className="py-2">
-                          {c.existing_kb_document_id}
+                          {c.existing_transcription_id}
                           <div className="text-[11px] text-muted-foreground truncate max-w-xs">
                             {c.existing_content_snippet}
                           </div>
@@ -202,49 +245,55 @@ export default function AdminDashboardPage() {
                 </TableBody>
               </Table>
             </div>
+             {isLoading && conflicts.length > 0 && ( 
+                <div className="p-4 text-center text-sm text-muted-foreground">Refreshing list...</div>
+            )}
+            {!isLoading && conflicts.length === 0 && (
+                <div className="p-4 text-center text-muted-foreground">No conflicts found.</div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Conflict Detail Modal */}
       <Dialog open={isModalOpen} onOpenChange={() => setIsModalOpen(false)}>
-        <DialogContent className="max-w-6xl min-w-[90vw] max-h-[90vh] overflow-hidden">
+        <DialogContent className="max-w-6xl min-w-[90vw] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {isDetailLoading
-                ? 'Loading…'
+                ? 'Loading Conflict Details…'
                 : detail
-                  ? `Conflict: ${detail.id}`
-                  : 'Conflict not found'}
+                  ? `Conflict ID: ${detail.id}`
+                  : 'Conflict Details Not Found'}
             </DialogTitle>
           </DialogHeader>
 
           {isDetailLoading && (
             <div className="p-4 text-center">
-              <Skeleton className="h-6 w-1/2 mx-auto" />
+              <Skeleton className="h-6 w-1/2 mx-auto mb-4" />
+              <Skeleton className="h-32 w-full mt-2 mb-2" />
               <Skeleton className="h-32 w-full mt-2" />
             </div>
           )}
 
           {!isDetailLoading && detail && (
             <>
-              <div className="grid grid-cols-2 gap-6 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 flex-grow overflow-y-auto p-1">
                 <div className="relative">
                   <div className="text-xs text-muted-foreground mb-2">
-                    {detail.pathLeft.join(' / ')}
+                    Existing: {detail.path_left && detail.path_left.join(' / ')}
                   </div>
-                  <div className="min-w-[300px] min-h-[200px] max-h-[400px] overflow-auto bg-muted/20 p-4 rounded border">
+                  <div className="min-w-[250px] min-h-[200px] max-h-[40vh] overflow-auto bg-muted/20 p-4 rounded border">
                     <pre className="text-sm whitespace-pre-wrap break-words">
-                      {detail.existingContent}
+                      {detail.existing_content}
                     </pre>
                   </div>
-                  {detail.status === CONFLICT_STATUSES.PENDING && (
+                  {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                     <div className="flex justify-end mt-2">
                       <span 
                         className={`text-sm cursor-pointer hover:underline ${
-                          chosenContent === detail.existingContent ? 'text-primary font-medium' : 'text-primary'
+                          chosenContent === detail.existing_content ? 'text-primary font-medium' : 'text-primary'
                         }`}
-                        onClick={() => setChosenContent(detail.existingContent)}
+                        onClick={() => setChosenContent(detail.existing_content || '')}
                       >
                         Keep Existing
                       </span>
@@ -253,20 +302,20 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="relative">
                   <div className="text-xs text-muted-foreground mb-2">
-                    {detail.pathRight.join(' / ')}
+                    Incoming: {detail.path_right && detail.path_right.join(' / ')}
                   </div>
-                  <div className="min-w-[300px] min-h-[200px] max-h-[400px] overflow-auto bg-muted/20 p-4 rounded border">
+                  <div className="min-w-[250px] min-h-[200px] max-h-[40vh] overflow-auto bg-muted/20 p-4 rounded border">
                     <pre className="text-sm whitespace-pre-wrap break-words">
-                      {detail.incomingContent}
+                      {detail.incoming_content}
                     </pre>
                   </div>
-                  {detail.status === CONFLICT_STATUSES.PENDING && (
+                  {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                     <div className="flex justify-end mt-2">
-                      <span 
+                       <span 
                         className={`text-sm cursor-pointer hover:underline ${
-                          chosenContent === detail.incomingContent ? 'text-primary font-medium' : 'text-primary'
+                          chosenContent === detail.incoming_content ? 'text-primary font-medium' : 'text-primary'
                         }`}
-                        onClick={() => setChosenContent(detail.incomingContent)}
+                        onClick={() => setChosenContent(detail.incoming_content || '')}
                       >
                         Accept Incoming
                       </span>
@@ -275,39 +324,46 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {detail.status === CONFLICT_STATUSES.PENDING ? (
-                <div className="mb-4">
-                  <div className="text-xs font-medium mb-1">Resolved Content:</div>
-                  <Textarea
-                    value={chosenContent}
-                    onChange={(e) => setChosenContent(e.target.value)}
-                    rows={6}
-                    className="font-mono"
-                  />
-                </div>
-              ) : (
-                <div className="mb-4">
-                  <div className="text-xs font-medium mb-1">Final Resolution:</div>
-                  <pre className="bg-muted/20 p-2 rounded text-sm whitespace-pre-wrap">
-                    {detail.resolutionNotes}
-                  </pre>
-                </div>
-              )}
-
-              <DialogFooter className="flex justify-end space-x-2">
+              <div className="mb-4">
+                {detail.status === LOCAL_CONFLICT_STATUSES.PENDING ? (
+                  <>
+                    <div className="text-xs font-medium mb-1">Edit Resolved Content / Notes:</div>
+                    <Textarea
+                      value={chosenContent}
+                      onChange={(e) => setChosenContent(e.target.value)}
+                      rows={6}
+                      className="font-mono text-sm"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs font-medium mb-1">Final Resolution Notes:</div>
+                    <pre className="bg-muted/20 p-2 rounded text-sm whitespace-pre-wrap max-h-[150px] overflow-y-auto">
+                      {detail.resolution_content}
+                    </pre>
+                  </>
+                )}
+              </div>
+              
+              <DialogFooter className="flex justify-end space-x-2 pt-0">
                 <DialogClose asChild>
                   <Button variant="outline">Cancel</Button>
                 </DialogClose>
-                {detail.status === CONFLICT_STATUSES.PENDING && (
+                {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                   <Button
                     onClick={handleResolve}
-                    disabled={isResolving}
+                    disabled={isResolving || !chosenContent.trim()}
                   >
-                    {isResolving ? 'Resolving…' : 'Resolve'}
+                    {isResolving ? 'Resolving…' : 'Mark as Resolved'}
                   </Button>
                 )}
               </DialogFooter>
             </>
+          )}
+          {!isDetailLoading && !detail && (
+             <div className="p-4 text-center text-muted-foreground">
+                Could not load conflict details.
+             </div>
           )}
         </DialogContent>
       </Dialog>

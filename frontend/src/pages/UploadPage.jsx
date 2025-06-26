@@ -156,13 +156,11 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                         value={keywords}
                                         onChange={(e) => setKeywords(e.target.value)}
                                         placeholder={`Enter one term per line. e.g.,
-                    
                     CSP (Cloud Service Provider),
-                    DB (DataBase)
                     Project Cerebro`}
                                         rows={5}
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-xs text-muted-foreground mt-3">
                                         This helps correct misinterpretations and ensures
                                         domain-specific terms are accurate.
                                     </p>
@@ -237,7 +235,7 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                         Generate Quiz/Mock Assignment
                                     </label>
                                 </div>
-                                <div className="flex items-top space-x-2">
+                                {/* <div className="flex items-top space-x-2">
                                     <Checkbox
                                         id="integrateKB"
                                         checked={integrateKB}
@@ -263,7 +261,7 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                             </TooltipProvider>
                                         </label>
                                     </div>
-                                </div>
+                                </div> */}
                             </CardContent>
                         </Card>
                     </div>

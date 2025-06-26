@@ -10,10 +10,18 @@ import {
 } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {  RefreshCw, History, Logs, Ellipsis } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { RefreshCw, History, Logs, Ellipsis } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
-import { getMockRepositoryData, TRANSCRIPTION_STATUSES } from '../mockData';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getPendingReviewTranscriptions, getReviewHistoryTranscriptions } from '../apiClient'; // Adjust path
+
+const TRANSCRIPTION_STATUSES = {
+    DRAFT: "Draft",
+    INTEGRATED: "Integrated",
+    PROCESSING: "Processing",
+    ERROR: "Error",
+};
 
 export default function PendingReviewsPage() {
     const navigate = useNavigate();
@@ -25,67 +33,24 @@ export default function PendingReviewsPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
-        async function fetch() {
-            const repo = await getMockRepositoryData();
-            const pending = repo.transcriptions
-                .map((t) => {
-                    if (t.id === 'trans_2')
-                        return {
-                            ...t,
-                            actual_status: TRANSCRIPTION_STATUSES.DRAFT,
-                            progress: 75,
-                        };
-                    if (Math.random() < 0.3)
-                        return {
-                            ...t,
-                            actual_status: TRANSCRIPTION_STATUSES.PROCESSING,
-                            progress: Math.floor(Math.random() * 90) + 10,
-                        };
-                    if (Math.random() < 0.2)
-                        return {
-                            ...t,
-                            actual_status: 'Awaiting Approval',
-                            progress: 100,
-                        };
-                    return {
-                        ...t,
-                        actual_status: t.status,
-                        progress:
-                            t.status === TRANSCRIPTION_STATUSES.INTEGRATED ? 100 : 0,
-                    };
-                })
-                .filter(
-                    (t) =>
-                        t.actual_status !== TRANSCRIPTION_STATUSES.INTEGRATED &&
-                        t.actual_status !== TRANSCRIPTION_STATUSES.ARCHIVED
-                )
-                .slice(0, 5);
-            setPendingItems(pending);
+        async function fetchData() {
+            setIsLoading(true);
+            try {
+                const [pendingData, historyData] = await Promise.all([
+                    getPendingReviewTranscriptions(),
+                    getReviewHistoryTranscriptions()
+                ]);
+                setPendingItems(pendingData);
+                setHistoryItems(historyData);
 
-            const history = repo.transcriptions
-                .filter(
-                    (t) =>
-                        t.status === TRANSCRIPTION_STATUSES.INTEGRATED ||
-                        t.status === TRANSCRIPTION_STATUSES.ARCHIVED
-                )
-                .sort(
-                    (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
-                )
-                .slice(0, 4)
-                .map((t) => ({
-                    ...t,
-                    action_taken:
-                        t.status === TRANSCRIPTION_STATUSES.INTEGRATED
-                            ? 'Approved & Integrated'
-                            : 'Archived',
-                    action_date: t.updated_at,
-                    reviewed_by: 'Admin User',
-                }));
-            setHistoryItems(history);
-            setLastUpdate(new Date());
-            setIsLoading(false);
+                setLastUpdate(new Date());
+            } catch (error) {
+                console.error("Failed to fetch review data:", error);
+            } finally {
+                setIsLoading(false);
+            }
         }
-        fetch();
+        fetchData();
     }, []);
 
     useEffect(() => {
@@ -94,57 +59,33 @@ export default function PendingReviewsPage() {
         return () => clearInterval(id);
     }, [lastUpdate]);
 
-    const handleRefresh = () => {
+    const handleRefresh = async () => {
         setIsRefreshing(true);
-        setTimeout(async () => {
-            const repo = await getMockRepositoryData();
-            const pending = repo.transcriptions
-                .map((t) => {
-                    if (t.id === 'trans_2')
-                        return {
-                            ...t,
-                            actual_status: TRANSCRIPTION_STATUSES.DRAFT,
-                            progress: 75,
-                        };
-                    if (Math.random() < 0.3)
-                        return {
-                            ...t,
-                            actual_status: TRANSCRIPTION_STATUSES.PROCESSING,
-                            progress: Math.floor(Math.random() * 90) + 10,
-                        };
-                    if (Math.random() < 0.2)
-                        return {
-                            ...t,
-                            actual_status: 'Awaiting Approval',
-                            progress: 100,
-                        };
-                    return {
-                        ...t,
-                        actual_status: t.status,
-                        progress:
-                            t.status === TRANSCRIPTION_STATUSES.INTEGRATED ? 100 : 0,
-                    };
-                })
-                .filter(
-                    (t) =>
-                        t.actual_status !== TRANSCRIPTION_STATUSES.INTEGRATED &&
-                        t.actual_status !== TRANSCRIPTION_STATUSES.ARCHIVED
-                )
-                .slice(0, 5);
-            setPendingItems(pending);
+        try {
+            const pendingData = await getPendingReviewTranscriptions();
+            setPendingItems(pendingData);
             setLastUpdate(new Date());
+        } catch (error) {
+            console.error("Failed to refresh pending items:", error);
+        } finally {
             setIsRefreshing(false);
-        }, 1000);
+        }
     };
 
-    const renderHistoryBadge = (action) => {
-        if (action.includes('Approved'))
-            return (
-                <StatusBadge status={TRANSCRIPTION_STATUSES.INTEGRATED} />
-            );
-        if (action.includes('Archived'))
-            return <StatusBadge status={TRANSCRIPTION_STATUSES.ARCHIVED} />;
-        return <Badge variant="secondary">{action}</Badge>;
+    const renderHistoryBadge = (status) => {
+        if (status === TRANSCRIPTION_STATUSES.INTEGRATED)
+            return <StatusBadge status={TRANSCRIPTION_STATUSES.INTEGRATED} />;
+        return <Badge variant="secondary">{status}</Badge>;
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString();
+    };
+
+    const formatDateTime = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleString();
     };
 
     if (isLoading) {
@@ -152,6 +93,7 @@ export default function PendingReviewsPage() {
             <div className="p-8">
                 <Skeleton className="h-6 w-1/3 mb-4" />
                 <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full mt-6" />
             </div>
         );
     }
@@ -166,13 +108,13 @@ export default function PendingReviewsPage() {
                     Track transcriptions being processed or awaiting review.
                 </p>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader className="flex justify-between items-center pb-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Logs size={20} className="text-muted-foreground" />
-                            Current Queue
-                        </CardTitle>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <Card className="lg:col-span-3">
+                    <CardHeader className="flex flex-row justify-between items-center pb-2">
+                        <div className="flex items-center gap-2">
+                             <Logs size={20} className="text-muted-foreground" />
+                             <CardTitle className="text-lg">Current Queue</CardTitle>
+                        </div>
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
                                 {elapsed}s ago
@@ -184,8 +126,7 @@ export default function PendingReviewsPage() {
                                 disabled={isRefreshing}
                             >
                                 <RefreshCw
-                                    className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''
-                                        }`}
+                                    className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
                                 />
                             </Button>
                         </div>
@@ -198,34 +139,30 @@ export default function PendingReviewsPage() {
                         ) : (
                             <div className="max-h-[60vh] overflow-y-auto p-4">
                                 <Table>
-                                    <TableHeader className="sticky top-0 bg-card">
+                                    <TableHeader className="sticky top-0 bg-card z-10">
                                         <TableRow>
                                             <TableHead>Title</TableHead>
+                                            {/* Folder column REMOVED from Current Queue */}
                                             <TableHead>Uploaded</TableHead>
+                                            <TableHead>Last Updated</TableHead>
                                             <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {pendingItems.map((item) => (
-                                            <TableRow key={item.id}>
-                                                <TableCell className="font-medium">
+                                            <TableRow key={item.id} onClick={() => navigate(`/review/${item.id}`)}>
+                                                <TableCell className="font-medium truncate max-w-xs">
                                                     {item.session_title}
                                                 </TableCell>
+                                                {/* TableCell for folder_name REMOVED */}
                                                 <TableCell className="text-xs">
-                                                    {new Date(item.uploaded_at).toLocaleDateString()}
+                                                    {formatDate(item.uploaded_at)}
+                                                </TableCell>
+                                                <TableCell className="text-xs">
+                                                    {formatDateTime(item.updated_at)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <StatusBadge status={item.actual_status} />
-                                                </TableCell>
-                                                <TableCell className="text-right pr-7">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="xs"
-                                                        onClick={() => navigate('/review')}
-                                                    >
-                                                        <Ellipsis size={12}/>
-                                                    </Button>
+                                                    <StatusBadge status={item.status} />
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -235,14 +172,14 @@ export default function PendingReviewsPage() {
                         )}
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                             <History size={20} className="text-muted-foreground" />
-                            Review History
-                        </CardTitle>
+                            <CardTitle className="text-lg">Review History</CardTitle>
+                        </div>
                         <CardDescription className="text-xs">
-                            Recently completed reviews.
+                            Recently completed reviews. Sorted by integration date.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -253,24 +190,21 @@ export default function PendingReviewsPage() {
                         ) : (
                             <div className="max-h-[60vh] overflow-y-auto p-4">
                                 <Table>
-                                    <TableHeader className="sticky top-0 bg-card">
+                                    <TableHeader className="sticky top-0 bg-card z-10">
                                         <TableRow>
                                             <TableHead>Title</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead className="text-right">Action</TableHead>
+                                            <TableHead className="text-right">Integrated Date</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {historyItems.map((item) => (
                                             <TableRow key={item.id}>
-                                                <TableCell className="truncate max-w-xs">
-                                                    {item.session_title}
+                                                <TableCell className="flex-col">
+                                                    <div className="truncate max-w-xs font-medium"> {item.session_title}</div>
+                                                    <div className="truncate max-w-xs text-xs font-extralight"> {item.folder_path}</div>
                                                 </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {new Date(item.action_date).toLocaleDateString()}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {renderHistoryBadge(item.action_taken)}
+                                                <TableCell className="text-xs text-right pr-8">
+                                                    {formatDate(item.integrated_at)}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
