@@ -95,4 +95,8 @@ export const resolveConflict = (conflictId, updateData) => {
   return apiClient.put(`/admin/conflicts/${conflictId}/resolve`, updateData);
 };
 
+export const getTranscriptionDetails = (transcriptionId) => {
+  return apiClient.get(`/transcriptions/${transcriptionId}`);
+};
+
 export default apiClient;

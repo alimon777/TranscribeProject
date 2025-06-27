@@ -167,18 +167,32 @@ def before_folder_insert(mapper, connection, target: Folder):
     else: target.path = target.name
 @event.listens_for(Folder, 'before_update')
 def before_folder_update(mapper, connection, target: Folder):
+    """Update folder path and children's paths if name or parent_id changes."""
     session = Session.object_session(target)
     if not session: return
-    state = orm_attributes.instance_state(target)
-    if not state.modified: return
-    if not any(c.key in ['name', 'parent_id'] for c in state.committed_state.values()): return
+    name_history = get_history(target, 'name')
+    parent_id_history = get_history(target, 'parent_id')
+
+    if not name_history.has_changes() and not parent_id_history.has_changes():
+        return
+
     if target.parent_id:
         parent = session.get(Folder, target.parent_id)
-        new_path = f"{parent.path} / {target.name}" if parent else target.name
-    else: new_path = target.name
+        if parent:
+            if 'path' not in orm_attributes.instance_state(parent).unloaded:
+                 new_path = f"{parent.path} / {target.name}"
+                 new_path = target.name
+        else:
+            new_path = target.name
+    else:
+        new_path = target.name
+    
+    # If path changed, update target and its children
     if target.path != new_path:
         target.path = new_path
-        if target.children: _recursively_update_children_paths(target, session)
+        if target.children:
+            _recursively_update_children_paths(target, session)
+            
 @event.listens_for(Transcription, 'after_update')
 def sync_folder_count_on_update(mapper, connection, target: Transcription):
     session = Session.object_session(target)
@@ -419,6 +433,27 @@ def get_conflict_detail(conflict_id: int, db: Session = Depends(get_db)):
         path_left = ["Unknown Source", conflict_db.existing_transcription_id]
 
     return ConflictDetailSchema(id=conflict_db.id, status=conflict_db.status, path_left=path_left, path_right=path_right, existing_content=conflict_db.existing_content_snippet, incoming_content=conflict_db.new_content_snippet, resolution_content=conflict_db.resolution_content)
+
+@router.get("/transcriptions/{transcription_id}", response_model=TranscriptionSchema, tags=["Transcriptions"])
+def get_transcription_details(transcription_id: int, db: Session = Depends(get_db)):
+    """
+    Fetches the full details for a single transcription by its ID,
+    including related folder, quiz, and session detail information.
+    """
+    db_transcription = db.query(Transcription)\
+                         .options(
+                             joinedload(Transcription.folder), 
+                             joinedload(Transcription.quiz), 
+                             joinedload(Transcription.session_detail)
+                         )\
+                         .filter(Transcription.id == transcription_id)\
+                         .first()
+
+    if not db_transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+    # The model_validator in TranscriptionSchema handles populating all necessary fields
+    return TranscriptionSchema.model_validate(db_transcription)
 
 @router.put("/admin/conflicts/{conflict_id}/resolve", response_model=ConflictSchema, tags=["Admin Conflicts"])
 def resolve_conflict_endpoint(conflict_id: int, update_data: ConflictUpdateSchema, db: Session = Depends(get_db)):

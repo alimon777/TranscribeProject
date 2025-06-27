@@ -30,7 +30,7 @@ export default function App() {
                 }
               />
               <Route
-                path="/review"
+                path="/review/:id"
                 element={
                   <ReviewPage
                     processedData={processedDataForReview}
