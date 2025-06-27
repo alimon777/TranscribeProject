@@ -151,7 +151,7 @@ export default function PendingReviewsPage() {
                                     <TableBody>
                                         {pendingItems.map((item) => (
                                             <TableRow key={item.id} onClick={() => navigate(`/review/${item.id}`)}>
-                                                <TableCell className="font-medium truncate max-w-xs">
+                                                <TableCell className="font-medium truncate max-w-2xs">
                                                     {item.session_title}
                                                 </TableCell>
                                                 {/* TableCell for folder_name REMOVED */}
@@ -193,17 +193,17 @@ export default function PendingReviewsPage() {
                                     <TableHeader className="sticky top-0 bg-card z-10">
                                         <TableRow>
                                             <TableHead>Title</TableHead>
-                                            <TableHead className="text-right">Integrated Date</TableHead>
+                                            <TableHead className="text-right">Integrated</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {historyItems.map((item) => (
                                             <TableRow key={item.id}>
                                                 <TableCell className="flex-col">
-                                                    <div className="truncate max-w-xs font-medium"> {item.session_title}</div>
-                                                    <div className="truncate max-w-xs text-xs font-extralight"> {item.folder_path}</div>
+                                                    <div className="truncate max-w-2xs font-medium"> {item.session_title}</div>
+                                                    <div className="truncate max-w-2xs text-xs font-extralight"> {item.folder_path}</div>
                                                 </TableCell>
-                                                <TableCell className="text-xs text-right pr-8">
+                                                <TableCell className="text-xs text-right">
                                                     {formatDate(item.integrated_at)}
                                                 </TableCell>
                                             </TableRow>

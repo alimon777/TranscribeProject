@@ -39,6 +39,7 @@ import {
   getRepositoryData,
   saveTranscriptionAsDraft,
   deleteTranscription,
+  getFolderTree, // Import getFolderTree
 } from '../apiClient'; // Ensure this path is correct
 import { useFolderOperations } from '../lib/useFolderOperations';
 import { TreeView } from '../components/ui/tree-view';
@@ -69,10 +70,10 @@ export default function RepositoryPage() {
   const [selectedTranscription, setSelectedTranscription] = useState(null);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
-  const [sortField, setSortField] = useState('integrated_at'); // Default to integrated_at
+  const [sortField, setSortField] = useState('integrated_at');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [activePurposeFilters, setActivePurposeFilters] = useState(new Set()); // New state for purpose filters
-  const [isLoading, setIsLoading] = useState(true);
+  const [activePurposeFilters, setActivePurposeFilters] = useState(new Set());
+  const [isLoading, setIsLoading] = useState(true); // Main loading state for the page
   const { confirm, alert } = usePopup();
 
   const {
@@ -81,23 +82,41 @@ export default function RepositoryPage() {
     handleDelete: handleDeleteFolder,
   } = useFolderOperations(treeData, setTreeData, selectedFolder, setSelectedFolder);
 
+  // Fetch initial folder tree data
+  useEffect(() => {
+    const fetchInitialTree = async () => {
+      // Not setting isLoading to true here, as the main page skeleton
+      // is primarily for the content (transcriptions). TreeView has its own conditional skeleton.
+      try {
+        const fetchedTree = await getFolderTree();
+        setTreeData(fetchedTree);
+      } catch (error) {
+        console.error("Failed to fetch folder tree:", error);
+        alert(`Failed to load folder tree: ${error.detail || error.message || 'Please try again.'}`);
+        setTreeData([]); // Set to empty on error
+      }
+    };
+    fetchInitialTree();
+  }, [alert, setTreeData]); // setTreeData is stable, alert from usePopup
+
   const fetchRepositoryContent = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoading(true); // This loading state is for transcriptions
     try {
       const params = {
         folder_id: selectedFolder === 'all' ? null : selectedFolder,
         search: search || undefined,
         sort_by: sortField,
         sort_order: sortOrder,
-        // status_filters is no longer sent from here, backend handles 'INTEGRATED'
         purpose_filters: activePurposeFilters.size > 0 ? Array.from(activePurposeFilters).join(',') : undefined,
       };
+      // MODIFIED: getRepositoryData now only returns transcriptions
       const repoData = await getRepositoryData(params);
       setTranscriptions(repoData.transcriptions);
-      setTreeData(repoData.folders);
+      // MODIFIED: No longer setting treeData from here
+      // setTreeData(repoData.folders); 
     } catch (error) {
-      console.error("Failed to fetch repository data:", error);
-      alert(`Failed to load repository data: ${error.detail || error.message || 'Please try again.'}`);
+      console.error("Failed to fetch repository transcriptions:", error);
+      alert(`Failed to load repository transcriptions: ${error.detail || error.message || 'Please try again.'}`);
       setTranscriptions([]);
     } finally {
       setIsLoading(false);
@@ -145,19 +164,18 @@ export default function RepositoryPage() {
     try {
       await saveTranscriptionAsDraft(selectedTranscription.id, {
         folder_id: targetFolderId,
-        // Ensure other fields are not unintentionally nulled if API expects them
-        // Send only folder_id if that's the only change for a "move"
       });
       alert(
         `Moved "${selectedTranscription.session_title}" to ${pathArray.join(' / ')}`
       );
       setSelectedTranscription(null);
       setMoveModalOpen(false);
-      fetchRepositoryContent();
+      fetchRepositoryContent(); // Refresh transcriptions list
     } catch (error) {
       console.error("Failed to move transcription:", error);
       alert(`Error moving transcription: ${error.detail || error.message || 'Unknown error'}`);
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -172,10 +190,11 @@ export default function RepositoryPage() {
         await deleteTranscription(selectedTranscription.id);
         alert(`Deleted "${selectedTranscription.session_title}".`);
         setSelectedTranscription(null);
-        fetchRepositoryContent();
+        fetchRepositoryContent(); // Refresh transcriptions list
       } catch (error) {
         console.error("Failed to delete transcription:", error);
         alert(`Error deleting transcription: ${error.detail || error.message || 'Unknown error'}`);
+      } finally {
         setIsLoading(false);
       }
     }
@@ -197,7 +216,8 @@ export default function RepositoryPage() {
     URL.revokeObjectURL(url);
   };
 
-
+  // Skeleton for the entire page if both tree and transcriptions are initially loading hard.
+  // isLoading primarily reflects transcription loading. treeData.length reflects tree loading.
   if (isLoading && transcriptions.length === 0 && treeData.length === 0) {
     return (
       <div className="p-4 md:p-6 w-full">
@@ -230,8 +250,11 @@ export default function RepositoryPage() {
       <div className="flex flex-col md:flex-row gap-6">
         <aside className="w-full md:w-64 border rounded p-2 flex-shrink-0">
           <h2 className="font-medium py-2 ml-3 mb-2">Directory</h2>
-          {isLoading && treeData.length === 0 ? (
-            <Skeleton className="h-40 w-full p-2" />
+          {/* Skeleton for TreeView - shows if treeData is not yet loaded */}
+          {treeData.length === 0 && !isLoading ? ( // Show only if not main loading and tree is empty
+             <Skeleton className="h-40 w-full p-2" />
+          ) : treeData.length === 0 && isLoading ? ( // If main loading and tree empty
+             <Skeleton className="h-40 w-full p-2" />
           ) : (
             <TreeView
               data={treeData}
@@ -242,15 +265,25 @@ export default function RepositoryPage() {
               }}
               onNodeAddCommit={async (parentId, name, proposedId) => {
                 const result = await handleAddFolder(parentId, name, proposedId);
-                if (result.success) fetchRepositoryContent();
+                // handleAddFolder (from useFolderOperations) updates treeData locally via setTreeData
+                if (result.success) {
+                   // Optionally, if adding a folder should refresh the tree from server:
+                   // const fetchedTree = await getFolderTree(); setTreeData(fetchedTree);
+                   fetchRepositoryContent(); // Refresh transcriptions
+                }
               }}
               onNodeEditCommit={async (id, newName, oldName) => {
                 const success = await handleRenameFolder(id, newName, oldName);
+                 // handleRenameFolder updates treeData locally
                 if (success) fetchRepositoryContent();
               }}
               onNodeDeleteCommit={async (id, name) => {
                 const success = await handleDeleteFolder(id, name);
-                if (success) fetchRepositoryContent();
+                // handleDeleteFolder updates treeData locally
+                if (success) {
+                    if(selectedFolder === id) setSelectedFolder('all'); // Reset selected if deleted
+                    fetchRepositoryContent();
+                }
               }}
               enableEditing
               allowRootFolderAdd
@@ -264,10 +297,10 @@ export default function RepositoryPage() {
               placeholder="Search integrated content..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-grow" // MODIFIED: Was flex-grow min-w-[200px] sm:min-w-[250px]
+              className="flex-grow"
             />
             <Select value={sortField} onValueChange={setSortField}>
-              <SelectTrigger className="w-[180px]"> {/* MODIFIED: Was w-full xs:w-auto min-w-[160px] */}
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Sort by..." />
               </SelectTrigger>
               <SelectContent>
@@ -275,6 +308,7 @@ export default function RepositoryPage() {
                 <SelectItem value="integrated_at">Integrated Date</SelectItem>
                 <SelectItem value="updated_at">Last Updated</SelectItem>
                 <SelectItem value="uploaded_at">Uploaded Date</SelectItem>
+                 <SelectItem value="session_purpose">Purpose</SelectItem> {/* Assuming backend supports this sort */}
               </SelectContent>
             </Select>
             <Button
@@ -293,7 +327,7 @@ export default function RepositoryPage() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="relative" // Kept as is, text requires some width
+                  className="relative"
                   aria-label="Filter by purpose"
                 >
                   <ListFilter className="h-4 w-4" />
@@ -358,6 +392,7 @@ export default function RepositoryPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Skeleton for transcriptions list */}
                   {isLoading && transcriptions.length === 0 ? (
                      <div className="max-h-[345px] overflow-auto p-4">
                         {[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full mb-2" />)}
@@ -417,7 +452,7 @@ export default function RepositoryPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon" 
-                                  className="h-8 w-8" // Explicit size for icon only button
+                                  className="h-8 w-8"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedTranscription(t);
@@ -438,7 +473,7 @@ export default function RepositoryPage() {
             </div>
 
             {selectedTranscription && (
-              <div className="w-full md:w-1/3 flex-shrink-0 mr-6">
+              <div className="w-full md:w-1/3 flex-shrink-0 mr-6"> {/* Was md:w-1/3. Could be adjusted if too cramped */}
                 <TranscriptionPreview
                   transcription={selectedTranscription}
                   folderName={getFolderName(selectedTranscription.folder_id)}
@@ -448,7 +483,7 @@ export default function RepositoryPage() {
                   onMove={() => setMoveModalOpen(true)}
                   onDownload={handleDownloadTranscription}
                   onEdit={() => navigate(`/transcribe/review/${selectedTranscription.id}`)}
-                  isIntegratedView={true} // Pass a prop to indicate this context if needed by preview
+                  isIntegratedView={true}
                 />
               </div>
             )}
@@ -471,7 +506,7 @@ export default function RepositoryPage() {
           onClose={() => setMoveModalOpen(false)}
           onConfirm={handleMoveTranscription}
           currentFolderId={selectedTranscription.folder_id}
-          treeData={treeData}
+          treeData={treeData} // Pass the separately fetched treeData
         />
       )}
     </div>
