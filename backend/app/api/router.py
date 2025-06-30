@@ -187,11 +187,23 @@ class ConflictResponse(BaseModel):
     status: str
     updated_date: datetime
     resolution_content: Optional[str]
+    path_left: Optional[str] = None
+    path_right: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True 
+
+class ConflictStats(BaseModel):
+    pending: int
+    resolved: int
+    rejected: int
+    total: int
+class ConflictListWithStatsResponse(BaseModel):
+    conflicts: List[ConflictResponse]
+    stats: ConflictStats
 
 class ConflictUpdate(BaseModel):
+    status: str
     resolution_content: str
 
 def build_tree(folders: List[Folder], parent_id=None) -> List[FolderResponse]:
@@ -216,6 +228,15 @@ def build_folder_path(folder: Folder, db: Session) -> str:
         parts.insert(0, current.name)
         current = db.query(Folder).get(current.parent_id) if current.parent_id else None
     return "/".join(parts)
+
+def calculate_conflict_stats(conflicts: list[Conflict]):
+    status_counts = {"pending": 0, "resolved": 0, "rejected": 0}
+    for conflict in conflicts:
+        key = conflict.status.lower()
+        if key in status_counts:
+            status_counts[key] += 1
+    status_counts["total"] = len(conflicts)
+    return status_counts
 
 @router.get("/folders/tree", response_model=List[FolderResponse])
 def get_folder_tree(db: Session = Depends(get_db)):
@@ -335,17 +356,50 @@ def delete_transcription(transcription_id: int, db: Session = Depends(get_db)):
 
     return {"message": f"Transcription {transcription_id} deleted successfully"}
 
-# @router.get("/admin/conflicts", response_model=List[ConflictResponse])
-# def get_conflicts(db: Session = Depends(get_db)):
-#     return db.query(Conflict).all()
+@router.get("/admin/conflicts", response_model=ConflictListWithStatsResponse)
+def get_conflicts(db: Session = Depends(get_db)):
+    conflicts = db.query(Conflict).all()
+    stats = calculate_conflict_stats(conflicts)
+    return {"conflicts": [ConflictResponse.model_validate(c) for c in conflicts], "stats": stats}
 
-# @router.get("/admin/conflicts/{conflict_id}/detail", response_model=ConflictDetailResponse)
-# def get_conflict_detail(conflict_id: int, db: Session = Depends(get_db)):
-#     ...
+@router.get("/admin/conflicts/{conflict_id}/detail", response_model=ConflictResponse)
+def get_conflict_detail(conflict_id: int, db: Session = Depends(get_db)):
+    conflict = db.query(Conflict).filter(Conflict.id == conflict_id).first()
+    if not conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
 
-# @router.put("/admin/conflicts/{conflict_id}/resolve")
-# def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session = Depends(get_db)):
-#     ...
+    new_trans = db.query(Transcription).filter(Transcription.id == conflict.new_transcription_id).first()
+    existing_trans = db.query(Transcription).filter(Transcription.id == int(conflict.existing_transcription_id)).first()
+
+    def get_path(t: Optional[Transcription]):
+        if t and t.folder_id:
+            folder = db.query(Folder).get(t.folder_id)
+            return build_folder_path(folder, db)
+        return ""
+    
+    resp_dict = conflict.__dict__.copy()
+    resp_dict["path_left"] = get_path(existing_trans)
+    resp_dict["path_right"] = get_path(new_trans)
+
+    return ConflictResponse.model_validate(resp_dict)
+
+@router.put("/admin/conflicts/{conflict_id}/resolve")
+def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session = Depends(get_db)):
+    conflict = db.query(Conflict).filter(Conflict.id == conflict_id).first()
+    if not conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+
+    conflict.status = update_data.status
+    conflict.resolution_content = update_data.resolution_content
+    conflict.updated_date = func.now()
+
+    db.commit()
+    db.refresh(conflict)
+
+    all_conflicts = db.query(Conflict).all()
+    new_stats = calculate_conflict_stats(all_conflicts)
+
+    return {"resolved_conflict": conflict, "newStats": new_stats}
 
 @router.get("/repository", response_model=List[FullTranscriptionResponse])
 def get_transcriptions(

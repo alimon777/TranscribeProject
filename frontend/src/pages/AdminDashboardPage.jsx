@@ -280,20 +280,20 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 flex-grow overflow-y-auto p-1">
                 <div className="relative">
                   <div className="text-xs text-muted-foreground mb-2">
-                    Existing: {detail.path_left && detail.path_left.join(' / ')}
+                    Existing: {detail.path_left}
                   </div>
                   <div className="min-w-[250px] min-h-[200px] max-h-[40vh] overflow-auto bg-muted/20 p-4 rounded border">
                     <pre className="text-sm whitespace-pre-wrap break-words">
-                      {detail.existing_content}
+                      {detail.existing_content_snippet}
                     </pre>
                   </div>
                   {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                     <div className="flex justify-end mt-2">
                       <span 
                         className={`text-sm cursor-pointer hover:underline ${
-                          chosenContent === detail.existing_content ? 'text-primary font-medium' : 'text-primary'
+                          chosenContent === detail.existing_content_snippet ? 'text-primary font-medium' : 'text-primary'
                         }`}
-                        onClick={() => setChosenContent(detail.existing_content || '')}
+                        onClick={() => setChosenContent(detail.existing_content_snippet || '')}
                       >
                         Keep Existing
                       </span>
@@ -302,20 +302,20 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="relative">
                   <div className="text-xs text-muted-foreground mb-2">
-                    Incoming: {detail.path_right && detail.path_right.join(' / ')}
+                    Incoming: {detail.path_right}
                   </div>
                   <div className="min-w-[250px] min-h-[200px] max-h-[40vh] overflow-auto bg-muted/20 p-4 rounded border">
                     <pre className="text-sm whitespace-pre-wrap break-words">
-                      {detail.incoming_content}
+                      {detail.new_content_snippet}
                     </pre>
                   </div>
                   {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                     <div className="flex justify-end mt-2">
                        <span 
                         className={`text-sm cursor-pointer hover:underline ${
-                          chosenContent === detail.incoming_content ? 'text-primary font-medium' : 'text-primary'
+                          chosenContent === detail.new_content_snippet ? 'text-primary font-medium' : 'text-primary'
                         }`}
-                        onClick={() => setChosenContent(detail.incoming_content || '')}
+                        onClick={() => setChosenContent(detail.new_content_snippet || '')}
                       >
                         Accept Incoming
                       </span>
