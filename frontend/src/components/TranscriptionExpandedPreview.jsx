@@ -16,15 +16,15 @@ export default function TranscriptionExpandedPreview({
       <DialogContent className="min-w-[90vw] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl flex gap-3">
-            <span>{transcription.session_title}</span>
+            <span>{transcription.title}</span>
           </DialogTitle>
           <DialogDescription className="flex flex-wrap">
             <span>
               {folderName} • {transcription.source_file_name} • Processed on{' '}
-              {new Date(transcription.integrated_at).toLocaleDateString()} •{' '}
+              {new Date(transcription.updated_date).toLocaleDateString()} •{' '}
             </span>
             <div className="ml-1 flex flex-wrap gap-1">
-              {transcription.topics?.map((topic) => (
+              {transcription.key_topics?.map((topic) => (
                 <Badge key={topic} variant="outline" className="text-xs">
                   {topic}
                 </Badge>
@@ -38,7 +38,7 @@ export default function TranscriptionExpandedPreview({
               <h3 className="pl-2 text-lg font-semibold mb-3">Content</h3>
               <div className="prose prose-sm max-w-none h-[calc(100%-40px)] overflow-y-auto">
                 <pre className="whitespace-pre-wrap text-sm font-mono bg-muted/30 p-4 rounded h-full">
-                  {transcription.cleaned_transcript_text}
+                  {transcription.transcript}
                 </pre>
               </div>
             </div>

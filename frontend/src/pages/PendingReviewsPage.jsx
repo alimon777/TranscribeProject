@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, History, Logs, Ellipsis } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getPendingReviewTranscriptions, getReviewHistoryTranscriptions } from '../apiClient'; // Adjust path
+import { getPendingReviewTranscriptions, getReviewHistoryTranscriptions } from '../services/apiClient';
 
 const TRANSCRIPTION_STATUSES = {
     DRAFT: "Draft",
@@ -152,14 +152,14 @@ export default function PendingReviewsPage() {
                                         {pendingItems.map((item) => (
                                             <TableRow key={item.id} onClick={() => navigate(`/review/${item.id}`)}>
                                                 <TableCell className="font-medium truncate max-w-2xs">
-                                                    {item.session_title}
+                                                    {item.title}
                                                 </TableCell>
                                                 {/* TableCell for folder_name REMOVED */}
                                                 <TableCell className="text-xs">
-                                                    {formatDate(item.uploaded_at)}
+                                                    {formatDate(item.uploaded_date)}
                                                 </TableCell>
                                                 <TableCell className="text-xs">
-                                                    {formatDateTime(item.updated_at)}
+                                                    {formatDateTime(item.updated_date)}
                                                 </TableCell>
                                                 <TableCell>
                                                     <StatusBadge status={item.status} />
@@ -200,11 +200,11 @@ export default function PendingReviewsPage() {
                                         {historyItems.map((item) => (
                                             <TableRow key={item.id}>
                                                 <TableCell className="flex-col">
-                                                    <div className="truncate max-w-2xs font-medium"> {item.session_title}</div>
+                                                    <div className="truncate max-w-2xs font-medium"> {item.title}</div>
                                                     <div className="truncate max-w-2xs text-xs font-extralight"> {item.folder_path}</div>
                                                 </TableCell>
                                                 <TableCell className="text-xs text-right">
-                                                    {formatDate(item.integrated_at)}
+                                                    {formatDate(item.updated_date)}
                                                 </TableCell>
                                             </TableRow>
                                         ))}

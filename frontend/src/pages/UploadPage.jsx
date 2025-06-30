@@ -20,11 +20,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import {
-    mockUploadAndProcess,
-    SESSION_PURPOSES,
-} from '../mockData';
 import { usePopup } from '@/components/PopupProvider';
+import { createTranscription, updateTranscription } from '@/services/apiClient';
 
 export default function UploadPage({ setProcessedDataForReview }) {
     const {alert} = usePopup();
@@ -36,6 +33,14 @@ export default function UploadPage({ setProcessedDataForReview }) {
     const [keywords, setKeywords] = useState('');
     const [generateQuiz, setGenerateQuiz] = useState(false);
     const [integrateKB, setIntegrateKB] = useState(true);
+    const SESSION_PURPOSES = [
+        "General Walkthrough/Overview",
+        "Requirements Gathering",
+        "Technical Deep Dive",
+        "Meeting Minutes",
+        "Training Session",
+        "Product Demo",
+      ];
     const [isProcessing, setIsProcessing] = useState(false);
 
     const handleFileChange = (e) => {
@@ -48,28 +53,61 @@ export default function UploadPage({ setProcessedDataForReview }) {
             alert('Please provide a session title or upload a file.');
             return;
         }
-        setIsProcessing(true);
+        // setIsProcessing(true);
         try {
-            const metadata = {
-                sessionTitle,
-                sessionPurpose,
-                primaryTopic,
-                keywords,
-                generateQuiz,
-                integrateKB,
-                uploadTime: new Date().toISOString(),
-            };
-            const result = await mockUploadAndProcess(
-                file ? { name: file.name, type: file.type, size: file.size } : null,
-                metadata
-            );
-            setProcessedDataForReview(result);
-            navigate('/review');
+            const formData = new FormData();
+            formData.append("media", file);
+            formData.append("sessionTitle", sessionTitle);
+            formData.append("sessionPurpose", sessionPurpose);
+            formData.append("primaryTopic", primaryTopic);
+            formData.append("source", file.name);
+            for (let pair of formData.entries()) {
+                console.log(pair[0] + ':', pair[1]);
+              }
+              const response = await fetch("http://localhost:8000/api/upload/transcribe",{
+                method: "POST",
+                body: formData, 
+            })
+            const data = await response.json()
+            const transcriptionId = data.transcription_id
+            navigate('/pending-reviews');
+            pollForTranscription(transcriptionId)
         } catch {
             alert('Failed to process content.');
-        } finally {
-            setIsProcessing(false);
         }
+        // finally {
+        //     setIsProcessing(false);
+        // }
+    };
+
+    const pollForTranscription = async (transcriptionId) => {
+        // const interval = setInterval(async () => {
+        try {
+            const metadata = new FormData();
+            metadata.append("transcription_id", transcriptionId);
+            metadata.append("keywords", keywords);
+            metadata.append("generateQuiz", generateQuiz.toString()); 
+            metadata.append("sessionPurpose", sessionPurpose);
+            const res = await fetch(`http://localhost:8000/api/transcribe/cleanup`,{
+                method: "POST",
+                body: metadata,
+            });
+            const result = await res.json();
+            console.log("Polling result:", result);
+    
+            if (result.status === "completed") {
+            // clearInterval(interval);
+            console.log("Transcription completed:", result.result);
+            // Display result to user or update UI here
+            } else if (result.status === "failed") {
+            // clearInterval(interval);
+            console.error("Transcription failed.");
+            }
+        } catch (err) {
+            console.error("Polling error:", err);
+            // clearInterval(interval);
+        }
+        // }, 3000); // poll every 3 seconds
     };
 
     return (
@@ -156,11 +194,13 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                         value={keywords}
                                         onChange={(e) => setKeywords(e.target.value)}
                                         placeholder={`Enter one term per line. e.g.,
+                    
                     CSP (Cloud Service Provider),
+                    DB (DataBase)
                     Project Cerebro`}
                                         rows={5}
                                     />
-                                    <p className="text-xs text-muted-foreground mt-3">
+                                    <p className="text-xs text-muted-foreground mt-1">
                                         This helps correct misinterpretations and ensures
                                         domain-specific terms are accurate.
                                     </p>
@@ -235,7 +275,7 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                         Generate Quiz/Mock Assignment
                                     </label>
                                 </div>
-                                {/* <div className="flex items-top space-x-2">
+                                <div className="flex items-top space-x-2">
                                     <Checkbox
                                         id="integrateKB"
                                         checked={integrateKB}
@@ -261,7 +301,7 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                             </TooltipProvider>
                                         </label>
                                     </div>
-                                </div> */}
+                                </div>
                             </CardContent>
                         </Card>
                     </div>

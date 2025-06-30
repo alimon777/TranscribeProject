@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -37,10 +37,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import {
   getRepositoryData,
-  saveTranscriptionAsDraft,
   deleteTranscription,
-  getFolderTree, // Import getFolderTree
-} from '../apiClient'; // Ensure this path is correct
+  getFolderTree} from '../services/apiClient';
 import { useFolderOperations } from '../lib/useFolderOperations';
 import { TreeView } from '../components/ui/tree-view';
 import TranscriptionPreview from '../components/TranscriptionPreview';
@@ -49,6 +47,8 @@ import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 // StatusBadge is no longer needed here as status is always 'Integrated'
 import { usePopup } from '../components/PopupProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ContextData } from '@/lib/ContextData';
+import { relocateTranscription } from '@/services/apiClient';
 
 // Session Purpose Enum Values (from backend SessionPurposeEnum)
 const SESSION_PURPOSE_OPTIONS = [
@@ -63,7 +63,7 @@ const SESSION_PURPOSE_OPTIONS = [
 
 export default function RepositoryPage() {
   const navigate = useNavigate();
-  const [treeData, setTreeData] = useState([]);
+  const {treeData, updateFolderTree} = useContext(ContextData);
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [transcriptions, setTranscriptions] = useState([]);
   const [search, setSearch] = useState('');
@@ -80,7 +80,7 @@ export default function RepositoryPage() {
     handleAdd: handleAddFolder,
     handleRename: handleRenameFolder,
     handleDelete: handleDeleteFolder,
-  } = useFolderOperations(treeData, setTreeData, selectedFolder, setSelectedFolder);
+  } = useFolderOperations(selectedFolder, setSelectedFolder);
 
   // Fetch initial folder tree data
   useEffect(() => {
@@ -89,15 +89,15 @@ export default function RepositoryPage() {
       // is primarily for the content (transcriptions). TreeView has its own conditional skeleton.
       try {
         const fetchedTree = await getFolderTree();
-        setTreeData(fetchedTree);
+        updateFolderTree(fetchedTree);
       } catch (error) {
         console.error("Failed to fetch folder tree:", error);
         alert(`Failed to load folder tree: ${error.detail || error.message || 'Please try again.'}`);
-        setTreeData([]); // Set to empty on error
+        updateFolderTree([]); // Set to empty on error
       }
     };
     fetchInitialTree();
-  }, [alert, setTreeData]); // setTreeData is stable, alert from usePopup
+  }, []);
 
   const fetchRepositoryContent = useCallback(async () => {
     setIsLoading(true); // This loading state is for transcriptions
@@ -111,7 +111,7 @@ export default function RepositoryPage() {
       };
       // MODIFIED: getRepositoryData now only returns transcriptions
       const repoData = await getRepositoryData(params);
-      setTranscriptions(repoData.transcriptions);
+      setTranscriptions(repoData);
       // MODIFIED: No longer setting treeData from here
       // setTreeData(repoData.folders); 
     } catch (error) {
@@ -162,11 +162,9 @@ export default function RepositoryPage() {
     if (!selectedTranscription) return;
     setIsLoading(true);
     try {
-      await saveTranscriptionAsDraft(selectedTranscription.id, {
-        folder_id: targetFolderId,
-      });
+      await relocateTranscription(selectedTranscription.id, targetFolderId);
       alert(
-        `Moved "${selectedTranscription.session_title}" to ${pathArray.join(' / ')}`
+        `Moved "${selectedTranscription.title}" to ${pathArray.join(' / ')}`
       );
       setSelectedTranscription(null);
       setMoveModalOpen(false);
@@ -182,13 +180,13 @@ export default function RepositoryPage() {
   const handleDeleteTranscription = async () => {
     if (!selectedTranscription) return;
     const ok = await confirm(
-      `Are you sure you want to delete "${selectedTranscription.session_title}"? This item is already integrated.`
+      `Are you sure you want to delete "${selectedTranscription.title}"? This item is already integrated.`
     );
     if (ok) {
       setIsLoading(true);
       try {
         await deleteTranscription(selectedTranscription.id);
-        alert(`Deleted "${selectedTranscription.session_title}".`);
+        alert(`Deleted "${selectedTranscription.title}".`);
         setSelectedTranscription(null);
         fetchRepositoryContent(); // Refresh transcriptions list
       } catch (error) {
@@ -202,12 +200,12 @@ export default function RepositoryPage() {
 
   const handleDownloadTranscription = () => {
     if (!selectedTranscription) return;
-    const content = `Title: ${selectedTranscription.session_title}\nPurpose: ${selectedTranscription.session_purpose || 'N/A'}\nIntegrated: ${new Date(selectedTranscription.integrated_at).toLocaleString()}\n\n${selectedTranscription.cleaned_transcript_text || 'No content available.'}`;
+    const content = `Title: ${selectedTranscription.title}\nPurpose: ${selectedTranscription.purpose || 'N/A'}\nIntegrated: ${new Date(selectedTranscription.updated_date).toLocaleString()}\n\n${selectedTranscription.transcript || 'No content available.'}`;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(selectedTranscription.session_title || 'transcription')
+    a.download = `${(selectedTranscription.title || 'transcription')
       .replace(/\W/g, '_')
       .toLowerCase()}_integrated.txt`;
     document.body.appendChild(a);
@@ -263,8 +261,8 @@ export default function RepositoryPage() {
                 setSelectedFolder(id);
                 setSelectedTranscription(null);
               }}
-              onNodeAddCommit={async (parentId, name, proposedId) => {
-                const result = await handleAddFolder(parentId, name, proposedId);
+              onNodeAddCommit={async (parentId, name) => {
+                const result = await handleAddFolder(parentId, name);
                 // handleAddFolder (from useFolderOperations) updates treeData locally via setTreeData
                 if (result.success) {
                    // Optionally, if adding a folder should refresh the tree from server:
@@ -424,28 +422,28 @@ export default function RepositoryPage() {
                               aria-selected={selectedTranscription?.id === t.id}
                             >
                               <TableCell>
-                                <div className="font-medium truncate max-w-[150px] sm:max-w-xs" title={t.session_title}>
-                                  {t.session_title}
+                                <div className="font-medium truncate max-w-[150px] sm:max-w-xs" title={t.title}>
+                                  {t.title}
                                 </div>
                                 <div className="text-xs text-muted-foreground truncate max-w-[150px] sm:max-w-xs" title={t.source_file_name}>
                                   {t.source_file_name || 'N/A'}
                                 </div>
                               </TableCell>
                               <TableCell className="hidden sm:table-cell">
-                                {t.integrated_at ? new Date(t.integrated_at).toLocaleDateString() : 'N/A'}
+                                {t.updated_date ? new Date(t.updated_date).toLocaleDateString() : 'N/A'}
                               </TableCell>
-                              <TableCell className="truncate max-w-[150px]" title={t.session_purpose}>
-                                {t.session_purpose || 'N/A'}
+                              <TableCell className="truncate max-w-[150px]" title={t.purpose}>
+                                {t.purpose || 'N/A'}
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
                                 <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                  {t.topic_names?.slice(0, 2).map((tp) => (
+                                  {t.key_topics?.slice(0, 2).map((tp) => (
                                     <Badge key={tp} variant="outline" className="text-xs">{tp}</Badge>
                                   ))}
-                                  {t.topic_names?.length > 2 && (
-                                    <Badge variant="outline" className="text-xs">+{t.topic_names.length - 2}</Badge>
+                                  {t.key_topics?.length > 2 && (
+                                    <Badge variant="outline" className="text-xs">+{t.key_topics.length - 2}</Badge>
                                   )}
-                                  {(t.topic_names || []).length === 0 && <span className="text-xs text-muted-foreground">N/A</span>}
+                                  {(t.key_topics || []).length === 0 && <span className="text-xs text-muted-foreground">N/A</span>}
                                 </div>
                               </TableCell>
                               <TableCell className="text-center">
@@ -457,7 +455,7 @@ export default function RepositoryPage() {
                                     e.stopPropagation();
                                     setSelectedTranscription(t);
                                   }}
-                                  aria-label={`Actions for ${t.session_title}`}
+                                  aria-label={`Actions for ${t.title}`}
                                 >
                                   <Ellipsis className="h-4 w-4" />
                                 </Button>

@@ -9,11 +9,10 @@ import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 import { usePopup } from '../components/PopupProvider';
 // MODIFIED: Import the new API function
 import {
-    saveTranscriptionAsDraft,
     finalizeTranscriptionIntegration,
     getTranscriptionDetails,
     deleteTranscription, // Optional, but good for a full "Discard" flow
-} from '../apiClient';
+} from '../services/apiClient';
 
 // MODIFIED: The component no longer receives props for data
 export default function ReviewPage() {
@@ -30,6 +29,8 @@ export default function ReviewPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [editedTranscription, setEditedTranscription] = useState('');
     const [editedQuiz, setEditedQuiz] = useState('');
+    const [provisionContent, setProvisionContent] = useState('');
+    const [highlights, setHighlights] = useState('');
 
     useEffect(() => {
         if (!transcriptionId) {
@@ -43,8 +44,10 @@ export default function ReviewPage() {
             try {
                 const data = await getTranscriptionDetails(transcriptionId);
                 setTranscriptionData(data);
-                setEditedTranscription(data.cleaned_transcript_text || '');
+                setEditedTranscription(data.transcript || '');
                 setEditedQuiz(data.quiz_content || '');
+                setProvisionContent(data.provison_content || '');
+                setHighlights(data.highlights || '');
             } catch (err) {
                 console.error("Failed to fetch transcription details:", err);
                 setError("Could not load the transcription for review. It may have been deleted or an error occurred.");
@@ -59,11 +62,14 @@ export default function ReviewPage() {
     const handleSaveDraft = async () => {
         setIsSaving(true);
         const updateData = {
-            cleaned_transcript_text: editedTranscription,
+            transcript: editedTranscription,
             quiz_content: editedQuiz,
+            provison_content: provisionContent,
+            highlights: highlights,
+            status: "Draft"
         };
         try {
-            await saveTranscriptionAsDraft(transcriptionId, updateData);
+            await finalizeTranscriptionIntegration(transcriptionId, updateData);
             alert('Draft saved successfully!');
             navigate('/repository');
         } catch (err) {
@@ -77,13 +83,16 @@ export default function ReviewPage() {
         setIsFolderModalOpen(false);
         setIsSaving(true);
         const updateData = {
-            cleaned_transcript_text: editedTranscription,
+            transcript: editedTranscription,
             quiz_content: editedQuiz,
+            provison_content: provisionContent,
+            highlights: highlights,
+            folder_id: folderId,
+            status: "Integrated"
         };
         try {
             const res = await finalizeTranscriptionIntegration(
                 transcriptionId,
-                folderId,
                 updateData
             );
             alert(res.message || 'Integration finalized successfully!');
@@ -154,15 +163,31 @@ export default function ReviewPage() {
                             </CardContent>
                         </Card>
                     )}
+                    <Card>
+                        <CardHeader><CardTitle>Content based on provision</CardTitle></CardHeader>
+                        <CardContent>
+                            <Textarea value={provisionContent} onChange={(e) => setProvisionContent(e.target.value)} rows={15} className="font-mono whitespace-pre-wrap" />
+                        </CardContent>
+                    </Card>
                 </div>
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader><CardTitle>Session Information</CardTitle></CardHeader>
                         <CardContent className="text-xs text-muted-foreground space-y-1.5">
-                            <div><strong>Title:</strong> {transcriptionData.session_title}</div>
-                            <div><strong>Purpose:</strong> {transcriptionData.session_purpose}</div>
-                            <div><strong>Topics:</strong> {transcriptionData.topic_names?.join(', ') || 'N/A'}</div>
-                            <div><strong>Processing Time:</strong> {Math.floor(transcriptionData.processing_time_seconds / 60)}m {transcriptionData.processing_time_seconds % 60}s</div>
+                            <div><strong>Title:</strong> {transcriptionData.title}</div>
+                            <div><strong>Purpose:</strong> {transcriptionData.purpose}</div>
+                            <div><strong>Topics:</strong> {transcriptionData.key_topics?.join(', ') || 'N/A'}</div>
+                            <div>
+                            <strong>Processing Time:</strong>{" "}
+                            {(() => {
+                                const start = new Date(transcriptionData.uploaded_date);
+                                const end = new Date(transcriptionData.updated_date);
+                                const diffInSeconds = Math.floor((end - start) / 1000);
+                                const minutes = Math.floor(diffInSeconds / 60);
+                                const seconds = diffInSeconds % 60;
+                                return `${minutes}m ${seconds}s`;
+                            })()}
+                            </div>
                             <div><strong>Integrated In:</strong> {transcriptionData.folder_path}</div>
                             <div><strong>Status:</strong> {transcriptionData.status}</div>
                         </CardContent>

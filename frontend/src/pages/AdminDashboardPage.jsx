@@ -24,7 +24,7 @@ import {
   getAdminConflicts, // Renamed in backend: get_admin_conflicts_endpoint
   getConflictDetail,
   resolveConflict,
-} from '../apiClient'; // Adjust path if needed
+} from '../services/apiClient';
 
 // Define string constants based on backend enums (values must match backend)
 const LOCAL_ANOMALY_TYPES = {
@@ -213,7 +213,7 @@ export default function AdminDashboardPage() {
                           </div>
                         </TableCell>
                         <TableCell className="py-2">
-                          {c.existing_transcription_id}
+                          {c.existing_transcription_title}
                           <div className="text-[11px] text-muted-foreground truncate max-w-xs">
                             {c.existing_content_snippet}
                           </div>
@@ -222,7 +222,7 @@ export default function AdminDashboardPage() {
                           <span className={anomalyClass}>{c.anomaly_type}</span>
                         </TableCell>
                         <TableCell className="py-2">
-                          {new Date(c.flagged_at).toLocaleDateString()}
+                          {new Date(c.updated_date).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="py-2">
                           <span className={statusClass}>{c.status}</span>

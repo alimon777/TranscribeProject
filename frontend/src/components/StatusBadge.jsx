@@ -1,9 +1,16 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { TRANSCRIPTION_STATUSES } from '../../src/mockData';
 
 export default function StatusBadge ({ status }) {
+  const TRANSCRIPTION_STATUSES = {
+    DRAFT: "Draft",
+    INTEGRATED: "Integrated",
+    ARCHIVED: "Archived",
+    PROCESSING: "Processing", 
+    ERROR: "Error",
+  };
+
   switch (status) {
     case TRANSCRIPTION_STATUSES.DRAFT:
       return (

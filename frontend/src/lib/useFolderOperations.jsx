@@ -1,38 +1,34 @@
-import { useCallback } from 'react';
+import { useCallback, useContext } from 'react';
 import {
   createFolder,
   renameFolder,
   deleteFolder,
-} from '../apiClient'; // Assuming api.js is in a directory named 'api' at the same level as 'lib'
+} from '../services/apiClient';
 import {
   addNodeRecursive,
   renameNodeRecursiveById,
   deleteNodeRecursiveById,
-} from './tree-utils'; // Assuming tree-utils.js is in the same 'lib' directory
+} from './tree-utils'; 
 import { usePopup } from '@/components/PopupProvider';
+import { ContextData } from '@/lib/contextData';
 
 export const useFolderOperations = (
-  treeData, // Current treeData state
-  setTreeData, // Setter for treeData
-  selectedFolder, // Current selected folder ID
-  setSelectedFolder // Setter for selected folder ID
+  selectedFolder, 
+  setSelectedFolder
 ) => {
-  const { alert, confirm } = usePopup(); // Assuming confirm is also available from usePopup
+  const {treeData,updateFolderTree} = useContext(ContextData);
+  const { alert, confirm } = usePopup();
 
   const handleAdd = useCallback(
-    async (parentId, name, proposedId) => {
+    async (parentId, name) => {
       try {
-        // For root folders, parentId might be null or a special value like 'root'.
-        // The API expects null for parent_id of top-level folders.
         const effectiveParentId = parentId === 'root' || parentId === 'all' ? null : parentId;
         const newFolderData = await createFolder({
           name,
-          parent_id: effectiveParentId,
-          id: proposedId || undefined, // Send undefined if no proposedId, API will generate
+          parent_id: parentId,
         });
-        // newFolderData should be FolderSchema from backend { id, name, parent_id, created_at, updated_at, count }
-        setTreeData((t) =>
-          addNodeRecursive(t, effectiveParentId, { ...newFolderData, children: [], count: 0 }) // Use count from response if available, else 0
+        updateFolderTree((t) =>
+          addNodeRecursive(t, effectiveParentId, { ...newFolderData, children: [], count: 0 }) 
         );
         return { success: true, finalId: newFolderData.id };
       } catch (error) {
@@ -41,14 +37,14 @@ export const useFolderOperations = (
         return { success: false };
       }
     },
-    [setTreeData, alert]
+    [updateFolderTree, alert]
   );
 
   const handleRename = useCallback(
     async (id, newName, oldName) => {
       try {
         await renameFolder(id, newName); // API expects { name: newName } in body, which renameFolder should handle
-        setTreeData((t) => renameNodeRecursiveById(t, id, newName));
+        updateFolderTree((t) => renameNodeRecursiveById(t, id, newName));
         return true;
       } catch (error) {
         console.error('Failed to rename folder:', error);
@@ -56,7 +52,7 @@ export const useFolderOperations = (
         return false;
       }
     },
-    [setTreeData, alert]
+    [updateFolderTree, alert]
   );
 
   const handleDelete = useCallback(
@@ -66,7 +62,7 @@ export const useFolderOperations = (
 
       try {
         await deleteFolder(id);
-        setTreeData((t) => deleteNodeRecursiveById(t, id));
+        updateFolderTree((t) => deleteNodeRecursiveById(t, id));
         if (selectedFolder === id) {
           setSelectedFolder('all'); // Or null, depending on desired behavior. 'all' is safer.
         }
@@ -79,7 +75,7 @@ export const useFolderOperations = (
         return false;
       }
     },
-    [setTreeData, selectedFolder, setSelectedFolder, alert, confirm]
+    [updateFolderTree, selectedFolder, setSelectedFolder, alert, confirm]
   );
 
   return { handleAdd, handleRename, handleDelete };

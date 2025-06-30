@@ -1,4 +1,5 @@
 import axios from 'axios';
+// import { stat } from 'fs';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -43,6 +44,7 @@ export const getPendingReviewTranscriptions = (params) => {
 export const getReviewHistoryTranscriptions = (params) => {
   return apiClient.get('/transcriptions/review-history', { params });
 };
+
 export const getFolderTree = () => {
   return apiClient.get('/folders/tree');
 };
@@ -59,20 +61,12 @@ export const deleteFolder = (folderId) => {
   return apiClient.delete(`/folders/${folderId}`);
 };
 
-export const uploadAndProcessTranscription = (metadata) => {
-  return apiClient.post('/transcriptions/upload-process', metadata);
-};
+// export const saveTranscriptionAsDraft = (transcriptionId, updateData) => {
+//   return apiClient.put(`/transcriptions/${transcriptionId}/save-draft`, updateData);
+// };
 
-export const saveTranscriptionAsDraft = (transcriptionId, updateData) => {
-  return apiClient.put(`/transcriptions/${transcriptionId}/save-draft`, updateData);
-};
-
-export const finalizeTranscriptionIntegration = (transcriptionId, targetFolderId, updatedData = null) => {
-  const payload = { target_folder_id };
-  if (updatedData) {
-    payload.updated_data = updatedData;
-  }
-  return apiClient.put(`/transcriptions/${transcriptionId}/finalize-integration`, payload);
+export const finalizeTranscriptionIntegration = (transcriptionId, updatedData = null) => {
+  return apiClient.put(`/transcriptions/${transcriptionId}/finalize-integration`, updatedData);
 };
 
 export const getRepositoryData = (params) => {
@@ -98,5 +92,17 @@ export const resolveConflict = (conflictId, updateData) => {
 export const getTranscriptionDetails = (transcriptionId) => {
   return apiClient.get(`/transcriptions/${transcriptionId}`);
 };
+
+export const createTranscription = (formData) => {
+  return apiClient.post("/upload/transcribe", formData);
+}
+
+export const updateTranscription = (metadata) => {
+  return apiClient.post("/transcribe/cleanup", metadata); 
+}
+
+export const relocateTranscription = (data) => {
+  return apiClient.put("/reloacte/transcription", data);
+}
 
 export default apiClient;

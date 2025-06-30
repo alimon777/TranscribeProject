@@ -1,9 +1,10 @@
 import asyncio
 import uuid
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, File, Form
 from fastapi.responses import JSONResponse
 import threading
-from services.transcription_service import convert_video_to_audio, process_audio_file, transcribe_audio_async
+from api.router import create_transcription, update_transcription, get_transcription
+from services.transcription_service import convert_video_to_audio, process_audio_file, transcribe_audio_async, generate_cleantranscription
 
 
 transcribe_router = APIRouter()
@@ -12,12 +13,19 @@ transcriptions_lock = threading.Lock()
 transcriptions = {}
 
 @transcribe_router.post("/upload/transcribe")
-async def upload_metadata(media: UploadFile = File(...)):
+async def upload_metadata(
+    media: UploadFile = File(...),
+    sessionTitle: str = Form(...),
+    sessionPurpose: str = Form(...),
+    primaryTopic: str = Form(...),
+    source: str = Form(...),):
     try:
         # Check if media file is provided
         if not media:
             raise HTTPException(
                 status_code=400, detail="No media file provided")
+        print("keywords", primaryTopic)
+        transcription_message = create_transcription(sessionTitle, sessionPurpose, primaryTopic, source)
 
         # Determine the file type and process accordingly
         content_type = media.content_type or ""
@@ -53,17 +61,10 @@ async def upload_metadata(media: UploadFile = File(...)):
                 status_code=500, detail=f"Failed to process {media_type} file"
             )
 
-        # Start transcription in a background asyncio task
-        transcription_id = str(uuid.uuid4())
-        with transcriptions_lock:
-            transcriptions[transcription_id] = {
-                "status": "in_progress",
-                "result": None,
-                "media_type": media_type,
-            }
+        transcription_id = transcription_message.get("id")
 
         # Create a background task for transcription
-        asyncio.create_task(transcribe_audio_async(processed_file_path, transcription_id, transcriptions, transcriptions_lock))
+        asyncio.create_task(transcribe_audio_async(processed_file_path, transcription_id))
 
         return JSONResponse(
             status_code=202,
@@ -76,13 +77,18 @@ async def upload_metadata(media: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@transcribe_router.get("/transcribe/{transcription_id}")
-async def get_transcription_status(transcription_id: str):
-    with transcriptions_lock:
-        transcription = transcriptions.get(transcription_id)
+@transcribe_router.post("/transcribe/cleanup")
+async def get_transcription_status(
+    transcription_id: str = Form(...), 
+    keywords: str = Form(...),
+    generateQuiz: bool = Form(...),
+    sessionPurpose: str = Form(...),):
 
-    if not transcription:
+    complete_transcription = await get_transcription(transcription_id)
+    if not complete_transcription:
         raise HTTPException(
             status_code=404, detail="Transcription ID not found")
-
-    return JSONResponse(content=transcription)
+    
+    cleaned_response = await generate_cleantranscription(complete_transcription.get("transcript"))
+    print(update_transcription(transcription_id, cleaned_response.get("cleaned_transcription"), cleaned_response.get("final_highlights")))
+    return JSONResponse(content=cleaned_response)

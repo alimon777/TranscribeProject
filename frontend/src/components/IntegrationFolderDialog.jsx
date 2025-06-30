@@ -1,6 +1,6 @@
 // src/components/IntegrationFolderDialog.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useFolderOperations } from '../lib/useFolderOperations';
-import { getFolderTree } from '../apiClient'; // Import the API function
 import { TreeView } from '../components/ui/tree-view';
 import { getNodePath } from '../lib/tree-utils';
+import { ContextData } from '@/lib/ContextData';
+import { getFolderTree } from '@/services/apiClient';
 
 export default function IntegrationFolderDialog({
   isOpen,
@@ -22,14 +23,14 @@ export default function IntegrationFolderDialog({
   suggestedPath = [],
   onConfirm,
 }) {
-  const [treeData, setTreeData] = useState([]);
+  const {treeData, updateFolderTree} = useContext(ContextData);
   const [selectedFolderId, setSelectedFolderId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // The hook now only needs the state setter
   const { handleAdd, handleRename, handleDelete } =
-    useFolderOperations(setTreeData);
+    useFolderOperations();
 
   useEffect(() => {
     if (isOpen) {
@@ -38,11 +39,11 @@ export default function IntegrationFolderDialog({
         setError(null);
         try {
           const data = await getFolderTree();
-          setTreeData(data);
+          updateFolderTree(data);
         } catch (err) {
           console.error('Failed to fetch folder tree:', err);
           setError('Could not load folders. Please try again.');
-          setTreeData([]); // Clear data on error
+          updateFolderTree([]); // Clear data on error
         } finally {
           setIsLoading(false);
         }

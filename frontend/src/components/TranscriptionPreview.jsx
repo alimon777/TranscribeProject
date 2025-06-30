@@ -33,7 +33,7 @@ export default function TranscriptionPreview({
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <CardTitle className="text-lg leading-tight">
-                {transcription.session_title}
+                {transcription.title}
               </CardTitle>
               <CardDescription className="text-xs mt-1">
                 {transcription.source_file_name}
@@ -49,20 +49,20 @@ export default function TranscriptionPreview({
             <div className="text-xs">
               <span className="font-medium">Integrated On:</span>
               <div className="text-muted-foreground">
-                {new Date(transcription.integrated_at).toLocaleDateString()}
+                {new Date(transcription.updated_date).toLocaleDateString()}
               </div>
             </div>
             <div className="text-xs">
               <span className="font-medium">Purpose:</span>
               <div className="text-muted-foreground">
-                {transcription.session_purpose}
+                {transcription.purpose}
               </div>
             </div>
           </div>
           <div>
             <div className="text-xs font-medium mb-2">Key Topics</div>
             <div className="flex flex-wrap gap-1">
-              {transcription.topic_names?.map((topic) => (
+              {transcription.key_topics?.map((topic) => (
                 <Badge key={topic} variant="outline" className="text-xs">
                   {topic}
                 </Badge>
@@ -72,7 +72,7 @@ export default function TranscriptionPreview({
           <div>
             <div className="text-xs font-medium mb-2">Content</div>
             <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded text-left max-h-32 overflow-y-auto">
-              {transcription.cleaned_transcript_text?.substring(0, 200)}...
+              {transcription.transcript?.substring(0, 200)}...
             </div>
           </div>
           <div className="flex gap-2">
