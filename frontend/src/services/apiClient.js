@@ -94,7 +94,17 @@ export const getTranscriptionDetails = (transcriptionId) => {
 };
 
 export const createTranscription = (formData) => {
-  return apiClient.post("/upload/transcribe", formData);
+  apiClient
+  .post("/upload/transcribe", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  })
+  .then((res) => {
+  })
+  .catch((err) => {
+    console.error("Upload failed:", err);
+  });
 }
 
 export const updateTranscription = (metadata) => {

@@ -53,7 +53,6 @@ export default function UploadPage({ setProcessedDataForReview }) {
             alert('Please provide a session title or upload a file.');
             return;
         }
-        // setIsProcessing(true);
         try {
             const formData = new FormData();
             formData.append("media", file);
@@ -61,53 +60,16 @@ export default function UploadPage({ setProcessedDataForReview }) {
             formData.append("sessionPurpose", sessionPurpose);
             formData.append("primaryTopic", primaryTopic);
             formData.append("source", file.name);
-            for (let pair of formData.entries()) {
-                console.log(pair[0] + ':', pair[1]);
-              }
-              const response = await fetch("http://localhost:8000/api/upload/transcribe",{
-                method: "POST",
-                body: formData, 
-            })
-            const data = await response.json()
-            const transcriptionId = data.transcription_id
+            formData.append("keywords", keywords);
+            formData.append("generateQuiz", generateQuiz.toString()); 
+            
+            createTranscription(formData, (data) => {
+                const transcriptionId = data.transcription_id;
+            });
             navigate('/pending-reviews');
-            pollForTranscription(transcriptionId)
         } catch {
             alert('Failed to process content.');
         }
-        // finally {
-        //     setIsProcessing(false);
-        // }
-    };
-
-    const pollForTranscription = async (transcriptionId) => {
-        // const interval = setInterval(async () => {
-        try {
-            const metadata = new FormData();
-            metadata.append("transcription_id", transcriptionId);
-            metadata.append("keywords", keywords);
-            metadata.append("generateQuiz", generateQuiz.toString()); 
-            metadata.append("sessionPurpose", sessionPurpose);
-            const res = await fetch(`http://localhost:8000/api/transcribe/cleanup`,{
-                method: "POST",
-                body: metadata,
-            });
-            const result = await res.json();
-            console.log("Polling result:", result);
-    
-            if (result.status === "completed") {
-            // clearInterval(interval);
-            console.log("Transcription completed:", result.result);
-            // Display result to user or update UI here
-            } else if (result.status === "failed") {
-            // clearInterval(interval);
-            console.error("Transcription failed.");
-            }
-        } catch (err) {
-            console.error("Polling error:", err);
-            // clearInterval(interval);
-        }
-        // }, 3000); // poll every 3 seconds
     };
 
     return (

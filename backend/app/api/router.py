@@ -415,6 +415,7 @@ def get_transcriptions(
         joinedload(Transcription.quiz),
         joinedload(Transcription.session_detail)
     )
+    query = query.filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
 
     if folder_id is not None:
         query = query.filter(Transcription.folder_id == folder_id)
