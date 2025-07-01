@@ -188,10 +188,22 @@ def convert_video_to_audio(video_file):
             audio_temp_path = temp_audio.name
             video_clip.audio.write_audiofile(
                 audio_temp_path)  # Convert video to audio
-            video_clip.close()  # Close the video clip to release resources
+            video_clip.close()  
+
+        # with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as sped_up_audio:
+        #     sped_up_audio_path = sped_up_audio.name
+
+        # # Run FFmpeg to speed up audio by 2x
+        # subprocess.run([
+        #     ffmpeg_path, "-y",  # -y to overwrite without asking
+        #     "-i", audio_temp_path,
+        #     "-filter:a", "atempo=2.0",
+        #     sped_up_audio_path
+        # ], check=True)
 
         # Clean up the temporary video file
         os.remove(temp_video_name)
+        # os.remove(audio_temp_path)
         return audio_temp_path  # Return the audio file path for streaming upload
     except ValueError as ve:
         print(f"Audio-related error: {ve}")
@@ -209,7 +221,18 @@ def process_audio_file(audio_file):
             temp_audio.write(audio_file.read())
             temp_audio.flush()
             audio_file_path = temp_audio.name
+        
+        # with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as sped_up:
+        #     final_audio_path = sped_up.name
+        
+        # subprocess.run([
+        #     ffmpeg_path, "-y",  # -y to overwrite without asking
+        #     "-i", audio_file_path,
+        #     "-filter:a", "atempo=2.0",
+        #     final_audio_path
+        # ], check=True)
 
+        # os.remove(audio_file_path)
         return audio_file_path
     except Exception as e:
         print(f"Error processing audio file: {e}")
@@ -293,17 +316,6 @@ def split_and_transcribe(audio_file_url):
         return sorted_transcriptions
     except Exception as e:
          raise HTTPException(status_code=500, detail=str(e))
-
-
-# Background task to transcribe the audio and update the status
-async def transcribe_audio_async(processed_file_path, transcription_id):
-    try:
-        result = split_and_transcribe(processed_file_path)
-        print(update_transcription(transcription_id,result,None))
-        os.remove(processed_file_path)
-    except Exception as e:
-        print("exception", e)
-        # If transcription fails, update the status to failed
 
 async def generate_cleantranscription(transcription):
 

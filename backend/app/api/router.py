@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import (
-    JSON, asc, create_engine, Column, Integer, String, Text,
+    JSON, asc, case, create_engine, Column, Integer, String, Text,
     DateTime, ForeignKey, desc, func, event, or_
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, backref, joinedload, selectinload
@@ -23,7 +23,7 @@ class SessionPurposeEnum:
     GENERAL_WALKTHROUGH = "General Walkthrough/Overview"; REQUIREMENTS_GATHERING = "Requirements Gathering"; TECHNICAL_DEEP_DIVE = "Technical Deep Dive"; MEETING_MINUTES = "Meeting Minutes"; TRAINING_SESSION = "Training Session"; PRODUCT_DEMO = "Product Demo"
     ALL_VALUES = [v for k, v in vars().items() if not k.startswith('_') and k != "ALL_VALUES"]
 class TranscriptionStatusEnum:
-    DRAFT = "Draft"; INTEGRATED = "Integrated"; PROCESSING = "Processing"; ERROR = "Error"
+    DRAFT = "Draft"; INTEGRATED = "Integrated"; PROCESSING = "Processing"; ERROR = "Error"; AWAITING = "Awaiting Approval"
     ALL_VALUES = [v for k, v in vars().items() if not k.startswith('_') and k != "ALL_VALUES"]
 class AnomalyTypeEnum:
     CONTRADICTION = "Contradiction"; OVERLAP = "Significant Overlap"; SEMANTIC_DIFFERENCE = "Semantic Difference"; OUTDATED_INFO = "Outdated Information"
@@ -285,7 +285,19 @@ def delete_folder(folder_id: int, db: Session = Depends(get_db)):
 
 @router.get("/transcriptions/pending-reviews", response_model=List[TranscriptionResponse])
 def get_pending_reviews(db: Session = Depends(get_db)):
-    pendings = db.query(Transcription).filter(Transcription.status == TranscriptionStatusEnum.PROCESSING)
+    pendings = (
+        db.query(Transcription)
+        .filter(
+            Transcription.status.in_([TranscriptionStatusEnum.PROCESSING, TranscriptionStatusEnum.AWAITING])
+        )
+        .order_by(
+            case(
+                (Transcription.status == TranscriptionStatusEnum.AWAITING, 0),
+                (Transcription.status == TranscriptionStatusEnum.PROCESSING, 1),
+            )
+        )
+        .all()
+    )
     return pendings
 
 @router.get("/transcriptions/review-history", response_model=List[TranscriptionResponse])
@@ -298,13 +310,6 @@ def get_review_history(db: Session = Depends(get_db)):
     .all()
     )
     return latest_three
-
-# @router.get("/transcriptions/{transcription_id}", response_model=TranscriptionResponse)
-# def get_transcription_details(transcription_id: int, db: Session = Depends(get_db)):
-#     return db.query(Transcription).filter(Transcription.id == transcription_id).first()
-
-# @router.put("/transcriptions/{transcription_id}/save-draft")
-# def save_transcription_draft(transcription_id: int, update_data: FinalizeIntegrationRequest, db: Session = Depends(get_db)):
 
 @router.put("/transcriptions/{transcription_id}/finalize-integration")
 def finalize_transcription_integration(
@@ -407,7 +412,7 @@ def get_transcriptions(
     search: Optional[str] = Query(None),
     sort_by: str = Query("updated_at"),
     sort_order: str = Query("desc"),
-    purpose_filters: Optional[str] = Query(None),  # comma-separated
+    purpose_filters: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     query = db.query(Transcription).options(
@@ -415,7 +420,7 @@ def get_transcriptions(
         joinedload(Transcription.quiz),
         joinedload(Transcription.session_detail)
     )
-    query = query.filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
+    # query = query.filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
 
     if folder_id is not None:
         query = query.filter(Transcription.folder_id == folder_id)
@@ -462,22 +467,12 @@ def get_transcriptions(
 
     for t in transcriptions:
         folder_path = build_folder_path(t.folder, db) if t.folder else ""
-        response.append({
-            "id": t.id,
-            "title": t.title,
-            "transcript": t.transcript,
-            "status": t.status,
-            "uploaded_date": t.uploaded_date,
-            "updated_date": t.updated_date,
-            "purpose": t.purpose,
-            "highlights": t.highlights,
-            "key_topics": t.key_topics,
-            "folder_id": t.folder_id,
-            "folder_path": folder_path,
-            "quiz_content": t.quiz.quiz_content if t.quiz else None,
-            "source_file_name": t.source_file_name,
-            "provision_content": t.session_detail.provison_content if t.session_detail else None,
-        })
+        transcription_data = jsonable_encoder(t)
+        t["folder_path"] = folder_path
+        t["quiz_content"] = t.quiz.quiz_content if t.quiz else None
+        t["provision_content"] = {}
+        t["provision_content"][t.purpose] = t.session_detail.provison_content if t.session_detail else None
+        response.append(t)
 
     return response
 
@@ -516,6 +511,7 @@ def update_transcription(transcription_id: int, transcription_text: str, highlig
     
         transcription.transcript = transcription_text
         transcription.highlights = highlights
+        transcription.status = TranscriptionStatusEnum.AWAITING
         db.commit()
         db.refresh(transcription)
         return {"message": "Transcription updated", "id": transcription_id}
@@ -553,6 +549,13 @@ async def get_transcription(transcription_id: int):
         db.close()
 
 
-# @router.put("/reloacte/transcription")
-# def relocate_transcription(data: dict = Body(...)):
-#     ...
+@router.put("/reloacte/transcription")
+def relocate_transcription(transcription_id: str, folder_id: str,db: Session = Depends(get_db)):
+    transcription = db.query(Transcription).get(transcription_id)
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+    
+    transcription.folder_id = folder_id
+    db.commit()
+    db.refresh(transcription)
+    return {"message": f"File: {transcription.title} moved successfully"}

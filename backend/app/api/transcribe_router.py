@@ -1,16 +1,19 @@
 import asyncio
+import os
+import shutil
+import tempfile
 import uuid
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile, HTTPException, File, Form
 from fastapi.responses import JSONResponse
 import threading
 from api.router import create_transcription, update_transcription, get_transcription
-from services.transcription_service import convert_video_to_audio, process_audio_file, transcribe_audio_async, generate_cleantranscription
+from services.transcription_service import convert_video_to_audio, process_audio_file, split_and_transcribe, generate_cleantranscription
 
 
 transcribe_router = APIRouter()
 
-transcriptions_lock = threading.Lock()
-transcriptions = {}
+def run_pipeline_wrapper(*args, **kwargs):
+    asyncio.run(full_transcription_pipeline(*args, **kwargs))
 
 @transcribe_router.post("/upload/transcribe")
 async def upload_metadata(
@@ -27,43 +30,27 @@ async def upload_metadata(
             raise HTTPException(status_code=400, detail="No media file provided")
 
         transcription_message = create_transcription(sessionTitle, sessionPurpose, primaryTopic, source)
-        content_type = media.content_type or ""
-
-        valid_video_formats = ["video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo"]
-        valid_audio_formats = ["audio/wav", "audio/mp3", "audio/mpeg", "audio/ogg"]
-
-        if content_type.startswith("video/") or content_type in valid_video_formats:
-            processed_file_path = convert_video_to_audio(media.file)
-            media_type = "video"
-        elif content_type.startswith("audio/") or content_type in valid_audio_formats:
-            processed_file_path = process_audio_file(media.file)
-            media_type = "audio"
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported media format: {content_type}. Supported: {valid_video_formats + valid_audio_formats}",
-            )
-
-        if processed_file_path is None:
-            raise HTTPException(status_code=500, detail="Failed to process media file")
-
         transcription_id = transcription_message["id"]
 
-        # Schedule the entire transcription-cleanup-quiz pipeline
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(media.filename)[-1]) as temp_file:
+            shutil.copyfileobj(media.file, temp_file)
+            temp_path = temp_file.name
+
+        # Schedule everything in the background, including format detection
         background_tasks.add_task(
-            full_transcription_pipeline,
-            processed_file_path,
+            run_pipeline_wrapper,
+            temp_path,
+            media.content_type,
             sessionPurpose,
             transcription_id,
-            "keywords",
-            False,
+            keywords,
+            generateQuiz
         )
 
         return JSONResponse(
             status_code=202,
             content={
                 "transcription_id": transcription_id,
-                "media_type": media_type,
                 "message": "Transcription pipeline started in background.",
             },
         )
@@ -71,21 +58,33 @@ async def upload_metadata(
         raise HTTPException(status_code=500, detail=str(e))
     
 async def full_transcription_pipeline(
-    processed_file_path: str,
+    temp_path: str,
+    content_type: str,
     sessionPurpose: str,
     transcription_id: str,
     keywords: str,
     generate_quiz: bool,
 ):
     try:
-        await transcribe_audio_async(processed_file_path, transcription_id)
+        valid_video_formats = ["video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo"]
+        valid_audio_formats = ["audio/wav", "audio/mp3", "audio/mpeg", "audio/ogg"]
 
-        complete_transcription = await get_transcription(transcription_id)
-        if not complete_transcription:
-            print(f"Transcription not found: {transcription_id}")
-            return
+        if content_type.startswith("video/") or content_type in valid_video_formats:
+            with open(temp_path, "rb") as file_obj:
+                processed_file_path = convert_video_to_audio(file_obj)
+        elif content_type.startswith("audio/") or content_type in valid_audio_formats:
+            processed_file_path = process_audio_file(temp_path)
+        else:
+            raise Exception(f"Unsupported media format: {content_type}")
 
-        cleaned_response = await generate_cleantranscription(complete_transcription["transcript"])
+        if not processed_file_path:
+            raise Exception("Failed to process media file")
+        
+        result = split_and_transcribe(processed_file_path)
+        print(update_transcription(transcription_id,result,None))
+        os.remove(processed_file_path)
+
+        cleaned_response = await generate_cleantranscription(result)
 
         update_transcription(
             transcription_id,
@@ -100,38 +99,3 @@ async def full_transcription_pipeline(
 
     except Exception as e:
         print(f"[ERROR] Transcription pipeline failed: {e}")
-    
-# @transcribe_router.post("/transcribe/cleanup")
-# async def get_transcription_status(
-#     transcription_id: str = Form(...), 
-#     keywords: str = Form(...),
-#     generateQuiz: bool = Form(...),
-#     sessionPurpose: str = Form(...),):
-
-#     async def cleanup_and_update():
-#         try:
-#             complete_transcription = await get_transcription(transcription_id)
-#             if not complete_transcription:
-#                 print(f"Transcription not found for ID: {transcription_id}")
-#                 return
-
-#             cleaned_response = await generate_cleantranscription(complete_transcription.get("transcript"))
-#             print(update_transcription(
-#                 transcription_id,
-#                 cleaned_response.get("cleaned_transcription"),
-#                 cleaned_response.get("final_highlights")
-#             ))
-
-#             # if generateQuiz:
-#             #     await generate_quiz_logic(transcription_id, keywords, cleaned_response)
-
-#         except Exception as e:
-#             print(f"Cleanup error for transcription {transcription_id}: {e}")
-
-#     # Schedule cleanup as a background task
-#     asyncio.create_task(cleanup_and_update())
-
-#     return JSONResponse(
-#         status_code=202,
-#         content={"status": "processing", "message": "Cleanup has started in background."}
-#     )
