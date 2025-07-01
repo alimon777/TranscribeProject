@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle, Trash2, FileEdit, Download, Save } from 'lucide-react';
+// MODIFIED: Added ArrowLeft icon
+import { CheckCircle, Trash2, FileEdit, Download, Save, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton'; // Needed for the Skeleton component
+import { Skeleton } from '@/components/ui/skeleton';
 import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 import { usePopup } from '../components/PopupProvider';
 import StatusBadge, { TRANSCRIPTION_STATUSES } from '../components/StatusBadge';
@@ -21,66 +22,69 @@ import {
 
 // --- Skeleton Component (Defined locally in this file) ---
 function ReviewPageSkeleton() {
-  return (
-    <div className="p-4 md:p-6 w-full animate-pulse">
-      {/* Header Skeleton */}
-      <div className="mb-6">
-        <Skeleton className="h-8 w-1/2 mb-2" />
-        <Skeleton className="h-5 w-2/3" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left Column Skeleton (Main Content) */}
-        <div className="lg:col-span-3 space-y-6">
-          <Skeleton className="h-12 w-full" /> {/* Banner Skeleton */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-1/3" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 border-b pb-3">
-                <Skeleton className="h-10 w-1/3" />
-                <Skeleton className="h-10 w-1/3" />
-              </div>
-              <Skeleton className="h-72 w-full mt-4" /> {/* Textarea Skeleton */}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column Skeleton (Info and Actions) */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-             <CardContent className="pt-6">
-              <div className="space-y-2 border-b pb-4 mb-4">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-1/3" />
-              </div>
-              <div>
-                <Skeleton className="h-5 w-1/4 mb-2" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-4/6" />
+    return (
+        <div className="p-4 md:p-6 w-full animate-pulse">
+            {/* Header Skeleton */}
+            <div className="mb-6 flex items-start gap-4">
+                <Skeleton className="h-10 w-10 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                    <Skeleton className="h-8 w-1/2 mb-2" />
+                    <Skeleton className="h-5 w-2/3" />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-1/2" />
-            </CardHeader>
-            <CardContent className="space-y-2.5">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-            </CardContent>
-          </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Left Column Skeleton (Main Content) */}
+                <div className="lg:col-span-3 space-y-6">
+                    <Skeleton className="h-12 w-full" /> {/* Banner Skeleton */}
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/3" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex gap-2 border-b pb-3">
+                                <Skeleton className="h-10 w-1/3" />
+                                <Skeleton className="h-10 w-1/3" />
+                            </div>
+                            <Skeleton className="h-72 w-full mt-4" /> {/* Textarea Skeleton */}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Right Column Skeleton (Info and Actions) */}
+                <div className="lg:col-span-2 space-y-6">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="space-y-2 border-b pb-4 mb-4">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                                <Skeleton className="h-4 w-5/6" />
+                                <Skeleton className="h-4 w-1/3" />
+                            </div>
+                            <div>
+                                <Skeleton className="h-5 w-1/4 mb-2" />
+                                <div className="space-y-2">
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-4/6" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/2" />
+                        </CardHeader>
+                        <CardContent className="space-y-2.5">
+                            <Skeleton className="h-9 w-full" />
+                            <Skeleton className="h-9 w-full" />
+                            <Skeleton className="h-9 w-full" />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 
@@ -139,7 +143,7 @@ export default function ReviewPage() {
         try {
             await finalizeTranscriptionIntegration(transcriptionId, updateData);
             alert('Draft saved successfully!');
-            navigate('/repository');
+            navigate('/pending-reviews'); // Navigate to pending reviews after saving draft
         } catch (err) {
             alert(err.detail || 'Failed to save draft.');
         } finally {
@@ -178,7 +182,7 @@ export default function ReviewPage() {
             try {
                 await deleteTranscription(transcriptionId);
                 alert("Transcription discarded.");
-                navigate('/upload');
+                navigate('/pending-reviews');
             } catch (err) {
                 alert("Failed to discard the transcription.");
             }
@@ -195,39 +199,45 @@ export default function ReviewPage() {
     const isIntegrated = transcriptionData.status === TRANSCRIPTION_STATUSES.INTEGRATED;
     const canFinalize = [TRANSCRIPTION_STATUSES.DRAFT, TRANSCRIPTION_STATUSES.AWAITING_APPROVAL].includes(transcriptionData.status);
     const canSaveAsDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
-    
+
     const tabCount = 1 + (provisionContent ? 1 : 0) + (editedQuiz ? 1 : 0);
     const tabGridClass = `grid w-full grid-cols-${tabCount}`;
 
     return (
         <div className="p-4 md:p-6 w-full">
-            <div className="mb-6">
-                {isIntegrated ? (
-                    <>
-                        <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
-                            <span>{transcriptionData.title}</span> 
-                            <StatusBadge status={transcriptionData.status} />
-                        </h1>
-                        <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span>{transcriptionData.folder_path}</span>
-                            <span>•</span>
-                            <span>{transcriptionData.source_file_name}</span>
-                            <span>•</span>
-                            <span>Processed on {new Date(transcriptionData.updated_date).toLocaleDateString()}</span>
-                            <span>•</span>
-                            <div className="flex flex-wrap gap-1">
-                                {transcriptionData.key_topics?.map((topic) => (
-                                    <Badge key={topic} variant="outline" className="text-xs">{topic}</Badge>
-                                ))}
+            {/* MODIFIED: Wrapped header in a flex container with the new back button */}
+            <div className="mb-6 flex items-start gap-4">
+                <Button variant="outline" size="icon" onClick={() => navigate(-1)} className="flex-shrink-0 h-10 w-10 rounded-full mt-3" aria-label="Go back">
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex-1">
+                    {isIntegrated ? (
+                        <>
+                            <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
+                                <span>{transcriptionData.title}</span>
+                                <StatusBadge status={transcriptionData.status} />
+                            </h1>
+                            <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span>{transcriptionData.folder_path || 'Uncategorized'}</span>
+                                <span>•</span>
+                                <span>{transcriptionData.source_file_name}</span>
+                                <span>•</span>
+                                <span>Processed on {new Date(transcriptionData.updated_date).toLocaleDateString()}</span>
+                                <span>•</span>
+                                <div className="flex flex-wrap gap-1">
+                                    {transcriptionData.key_topics?.map((topic) => (
+                                        <Badge key={topic} variant="outline" className="text-xs">{topic}</Badge>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <h1 className="text-3xl font-semibold mb-1">Review & Edit Generated Content</h1>
-                        <p className="text-md text-muted-foreground">Review the processed content before finalizing its integration.</p>
-                    </>
-                )}
+                        </>
+                    ) : (
+                        <>
+                            <h1 className="text-3xl font-semibold mb-1">Review & Edit Generated Content</h1>
+                            <p className="text-md text-muted-foreground">Review the processed content before finalizing its integration.</p>
+                        </>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -273,8 +283,9 @@ export default function ReviewPage() {
                 </div>
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
-                        <CardContent className="text-sm pt-6">
+                        <CardContent className="text-sm">
                             {!isIntegrated && <>
+                                <h4 className="font-semibold mb-3 text-primary ">Session Information</h4>
                                 <div className="text-xs text-muted-foreground space-y-2 border-b pb-4 mb-4">
                                     <div><strong>Title:</strong> {transcriptionData.title}</div>
                                     <div><strong>Purpose:</strong> {transcriptionData.purpose}</div>
@@ -304,7 +315,7 @@ export default function ReviewPage() {
                                 )}
                                 {canSaveAsDraft && (
                                     <Button size="sm" variant="outline" className="w-full" onClick={handleSaveDraft} disabled={isSaving}>
-                                        Save as Draft
+                                        <Save className="mr-2 h-4 w-4" /> Save as Draft
                                     </Button>
                                 )}
                                 <Button size="sm" variant="outline" className="w-full" disabled><Download className="mr-2 h-4 w-4" />Download Content</Button>

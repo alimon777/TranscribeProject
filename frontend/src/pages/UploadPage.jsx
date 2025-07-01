@@ -117,7 +117,7 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                         Session Purpose
                                     </label>
                                     <Select value={sessionPurpose} onValueChange={setSessionPurpose}>
-                                        <SelectTrigger>
+                                        <SelectTrigger className='w-full'>
                                             <SelectValue placeholder="Select session purpose" />
                                         </SelectTrigger>
                                         <SelectContent>

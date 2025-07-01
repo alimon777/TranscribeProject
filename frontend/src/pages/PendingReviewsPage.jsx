@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { RefreshCw, History, Logs, FileEdit } from 'lucide-react';
 import StatusBadge, { TRANSCRIPTION_STATUSES } from '../components/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,7 +33,6 @@ export default function PendingReviewsPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [rightCardMode, setRightCardMode] = useState('history');
 
-    // MODIFIED: This function now contains the filtering logic
     const processAndSetData = (pendingData, combinedHistoryAndDrafts) => {
         const filteredHistory = [];
         const filteredDrafts = [];
@@ -55,7 +55,6 @@ export default function PendingReviewsPage() {
         async function fetchData() {
             setIsLoading(true);
             try {
-                // MODIFIED: Fetch only two data sources now
                 const [pendingData, combinedData] = await Promise.all([
                     getPendingReviewTranscriptions(),
                     getReviewHistoryTranscriptions(),
@@ -79,6 +78,7 @@ export default function PendingReviewsPage() {
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
+            // Only refresh the pending queue, history/drafts don't need constant refresh
             const pendingData = await getPendingReviewTranscriptions();
             setPendingItems(pendingData);
             setLastUpdate(new Date()); // Reset the timer
@@ -99,7 +99,6 @@ export default function PendingReviewsPage() {
         return new Date(dateString).toLocaleString();
     };
 
-    // --- Skeleton loader remains the same and is correct ---
     if (isLoading) {
         return (
             <div className="p-4 md:p-6 w-full">
@@ -182,7 +181,7 @@ export default function PendingReviewsPage() {
                                         {pendingItems.map((item) => {
                                             const isActionable = ACTIONABLE_STATUSES.includes(item.status);
                                             return (
-                                                <TableRow key={item.id} onClick={isActionable ? () => navigate(`/transcribe/review/${item.id}`) : undefined} className={isActionable ? 'cursor-pointer hover:bg-muted' : 'opacity-70 cursor-default'}>
+                                                <TableRow key={item.id} onClick={isActionable ? () => navigate(`/transcription/${item.id}`) : undefined} className={isActionable ? 'cursor-pointer hover:bg-muted' : 'opacity-70 cursor-default'}>
                                                     <TableCell className="font-medium truncate max-w-2xs">{item.title}</TableCell>
                                                     <TableCell className="text-xs">{formatDate(item.uploaded_date)}</TableCell>
                                                     <TableCell className="text-xs">{formatDateTime(item.updated_date)}</TableCell>
@@ -209,9 +208,23 @@ export default function PendingReviewsPage() {
                                     </CardDescription>
                                 </div>
                             </div>
-                            <Button className="cursor-pointer" variant="secondary" size="sm" onClick={() => setRightCardMode(prev => prev === 'history' ? 'drafts' : 'history')}>
-                                {rightCardMode === 'history' ? 'Drafts' : 'History'}
-                            </Button>
+                            {/* MODIFIED: Replaced Button with ToggleGroup */}
+                            <ToggleGroup 
+                                type="single" 
+                                size="sm" 
+                                value={rightCardMode}
+                                onValueChange={(value) => {
+                                    // Ensure the toggle group always has a value
+                                    if (value) setRightCardMode(value);
+                                }}
+                            >
+                                <ToggleGroupItem value="history" aria-label="View history">
+                                    History
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="drafts" aria-label="View drafts">
+                                    Drafts
+                                </ToggleGroupItem>
+                            </ToggleGroup>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
