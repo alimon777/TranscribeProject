@@ -304,7 +304,7 @@ def get_pending_reviews(db: Session = Depends(get_db)):
 def get_review_history(db: Session = Depends(get_db)):
     latest_three = (
     db.query(Transcription)
-    .filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
+    .filter(Transcription.status.in_([TranscriptionStatusEnum.INTEGRATED, TranscriptionStatusEnum.DRAFT]))
     .order_by(desc(Transcription.updated_date))
     .limit(3)
     .all()
@@ -420,7 +420,7 @@ def get_transcriptions(
         joinedload(Transcription.quiz),
         joinedload(Transcription.session_detail)
     )
-    # query = query.filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
+    query = query.filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
 
     if folder_id is not None:
         query = query.filter(Transcription.folder_id == folder_id)
