@@ -44,13 +44,11 @@ import {
 import { useFolderOperations } from '../lib/useFolderOperations';
 import { TreeView } from '../components/ui/tree-view';
 import TranscriptionPreview from '../components/TranscriptionPreview';
-// MODIFIED: TranscriptionExpandedPreview is no longer needed
-// import TranscriptionExpandedPreview from '../components/TranscriptionExpandedPreview';
+import CardIllustration from '@/svg_components/CardsIllustration';
 import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 import { usePopup } from '../components/PopupProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContextData } from '@/lib/ContextData';
-import IllustrationCard from "../assets/Illustration_card.svg"
 
 // Session Purpose Enum Values
 const SESSION_PURPOSE_OPTIONS = [
@@ -97,7 +95,7 @@ export default function RepositoryPage() {
       }
     };
     fetchInitialTree();
-  }, [updateFolderTree, alert]);
+  }, []); 
 
   // ... fetchRepositoryContent and other handlers remain the same ...
   const fetchRepositoryContent = useCallback(async () => {
@@ -119,7 +117,7 @@ export default function RepositoryPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedFolder, search, sortField, sortOrder, activePurposeFilters, alert]);
+  }, [selectedFolder, search, sortField, sortOrder, activePurposeFilters]);
 
   useEffect(() => {
     fetchRepositoryContent();
@@ -326,7 +324,7 @@ export default function RepositoryPage() {
                     </div>
                   ) : transcriptions.length === 0 ? (
                     <div className='flex-row justify-items-center'>
-                      <img src={IllustrationCard} className='h-50 w-50' />
+                      <CardIllustration className='h-50 w-50'/>
                       <div className="text-muted-foreground -mt-12 text-sm">No integrated transcriptions found matching your criteria.</div>
                     </div>
                   ) : (

@@ -19,7 +19,6 @@ import { AlertTriangle, CheckCircle, XCircle, ListFilter, Ellipsis } from 'lucid
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import IllustrationCard from "../assets/Illustration_card.svg"
 
 import {
   getAdminConflicts, // Renamed in backend: get_admin_conflicts_endpoint
@@ -27,6 +26,7 @@ import {
   resolveConflict,
 } from '../services/apiClient';
 
+import CardIllustration from '@/svg_components/CardsIllustration';
 // Define string constants based on backend enums (values must match backend)
 const LOCAL_ANOMALY_TYPES = {
   SEMANTIC_DIFFERENCE: "Semantic Difference",
@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
             )}
             {!isLoading && conflicts.length === 0 && (
               <div className='flex-row justify-items-center'>
-                <img src={IllustrationCard} className='h-30 w-30' />
+                <CardIllustration className='h-30 w-30'/>
                 <div className="text-muted-foreground -mt-7 text-sm">No conflicts found.</div>
               </div>
             )}

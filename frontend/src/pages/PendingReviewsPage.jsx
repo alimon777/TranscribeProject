@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, History, Logs, FileEdit } from 'lucide-react';
 import StatusBadge, { TRANSCRIPTION_STATUSES } from '../components/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
-// MODIFIED: getDraftTranscriptions is no longer needed
 import { getPendingReviewTranscriptions, getReviewHistoryTranscriptions } from '../services/apiClient';
+import CardIllustration from '@/svg_components/CardsIllustration';
 
 const ACTIONABLE_STATUSES = [
     TRANSCRIPTION_STATUSES.DRAFT,
@@ -103,32 +103,32 @@ export default function PendingReviewsPage() {
     if (isLoading) {
         return (
             <div className="p-4 md:p-6 w-full">
-                 <div className="mb-6">
+                <div className="mb-6">
                     <Skeleton className="h-8 w-1/3 mb-2" />
                     <Skeleton className="h-5 w-1/2" />
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-pulse">
                     <Card className="lg:col-span-3">
                         <CardHeader className='pb-2'>
-                           <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center">
                                 <Skeleton className="h-6 w-1/3" />
                                 <Skeleton className="h-6 w-1/4" />
-                           </div>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-4 space-y-2">
-                           <Skeleton className="h-8 w-full" />
-                           <Skeleton className="h-8 w-full" />
-                           <Skeleton className="h-8 w-full" />
-                           <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
                         </CardContent>
                     </Card>
                     <Card className="lg:col-span-2">
                         <CardHeader>
-                             <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center">
                                 <Skeleton className="h-6 w-1/2" />
                                 <Skeleton className="h-9 w-20" />
-                           </div>
-                           <Skeleton className="h-4 w-full mt-1" />
+                            </div>
+                            <Skeleton className="h-4 w-full mt-1" />
                         </CardHeader>
                         <CardContent className="p-4 space-y-2">
                             <Skeleton className="h-8 w-full" />
@@ -151,8 +151,8 @@ export default function PendingReviewsPage() {
                 <Card className="lg:col-span-3">
                     <CardHeader className="flex flex-row justify-between items-center pb-2">
                         <div className="flex items-center gap-2">
-                             <Logs size={20} className="text-muted-foreground" />
-                             <CardTitle className="text-lg">Current Queue</CardTitle>
+                            <Logs size={20} className="text-muted-foreground" />
+                            <CardTitle className="text-lg">Current Queue</CardTitle>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">{elapsed}s ago</span>
@@ -163,7 +163,10 @@ export default function PendingReviewsPage() {
                     </CardHeader>
                     <CardContent className="p-0">
                         {pendingItems.length === 0 ? (
-                            <p className="p-4 text-center text-muted-foreground">No items currently pending.</p>
+                            <div className='flex-row justify-items-center'>
+                                <CardIllustration className='h-50 w-50'/>
+                                <div className="text-muted-foreground -mt-12 text-sm">No items currently pending.</div>
+                            </div>
                         ) : (
                             <div className="max-h-[60vh] overflow-y-auto p-4">
                                 <Table>
@@ -193,27 +196,32 @@ export default function PendingReviewsPage() {
                         )}
                     </CardContent>
                 </Card>
-                
+
                 <Card className="lg:col-span-2">
                     <CardHeader>
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 {rightCardMode === 'history' ? <History size={20} className="text-muted-foreground" /> : <FileEdit size={20} className="text-muted-foreground" />}
-                                <CardTitle className="text-lg ">{rightCardMode === 'history' ? 'Review History' : 'Saved Drafts'}</CardTitle>
+                                <div>
+                                    <CardTitle className="text-lg ">{rightCardMode === 'history' ? 'Review History' : 'Saved Drafts'}</CardTitle>
+                                    <CardDescription className="text-xs">
+                                        {rightCardMode === 'history' ? 'Recently integrated items.' : 'Items you have saved to finish later.'}
+                                    </CardDescription>
+                                </div>
                             </div>
-                            <Button className="cursor-pointer"variant="secondary" size="sm" onClick={() => setRightCardMode(prev => prev === 'history' ? 'drafts' : 'history')}>
+                            <Button className="cursor-pointer" variant="secondary" size="sm" onClick={() => setRightCardMode(prev => prev === 'history' ? 'drafts' : 'history')}>
                                 {rightCardMode === 'history' ? 'Drafts' : 'History'}
                             </Button>
                         </div>
-                        <CardDescription className="text-xs pt-1">
-                            {rightCardMode === 'history' ? 'Recently integrated items.' : 'Items you have saved to finish later.'}
-                        </CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                         {rightCardMode === 'history' ? (
                             // History View
                             historyItems.length === 0 ? (
-                                <p className="p-4 text-center text-muted-foreground">No recent history.</p>
+                                <div className='flex-row justify-items-center -mt-4'>
+                                    <CardIllustration className='h-50 w-50'/>
+                                    <div className="text-muted-foreground -mt-12 text-sm">No recent history.</div>
+                                </div>
                             ) : (
                                 <div className="max-h-[60vh] overflow-y-auto p-4">
                                     <Table>
@@ -240,7 +248,10 @@ export default function PendingReviewsPage() {
                         ) : (
                             // Drafts View
                             draftItems.length === 0 ? (
-                                <p className="p-4 text-center text-muted-foreground">No saved drafts.</p>
+                                <div className='flex-row justify-items-center -mt-4'>
+                                    <CardIllustration className='h-50 w-50'/>
+                                    <div className="text-muted-foreground -mt-12 text-sm">No saved drafts.</div>
+                                </div>
                             ) : (
                                 <div className="max-h-[60vh] overflow-y-auto p-4">
                                     <Table>
