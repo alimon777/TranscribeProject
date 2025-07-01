@@ -32,7 +32,6 @@ export default function UploadPage({ setProcessedDataForReview }) {
     const [primaryTopic, setPrimaryTopic] = useState('');
     const [keywords, setKeywords] = useState('');
     const [generateQuiz, setGenerateQuiz] = useState(false);
-    const [integrateKB, setIntegrateKB] = useState(true);
     const SESSION_PURPOSES = [
         "General Walkthrough/Overview",
         "Requirements Gathering",
@@ -156,10 +155,9 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                         value={keywords}
                                         onChange={(e) => setKeywords(e.target.value)}
                                         placeholder={`Enter one term per line. e.g.,
-                    
                     CSP (Cloud Service Provider),
-                    DB (DataBase)
-                    Project Cerebro`}
+                    DB (DataBase),
+                    ISP (Internet Service Provider)`}
                                         rows={5}
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
@@ -236,33 +234,6 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                     >
                                         Generate Quiz/Mock Assignment
                                     </label>
-                                </div>
-                                <div className="flex items-top space-x-2">
-                                    <Checkbox
-                                        id="integrateKB"
-                                        checked={integrateKB}
-                                        onCheckedChange={setIntegrateKB}
-                                    />
-                                    <div className="grid gap-1.5 leading-none">
-                                        <label
-                                            htmlFor="integrateKB"
-                                            className="text-sm font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                        >
-                                            Integrate into Knowledge Base
-                                            <TooltipProvider delayDuration={100}>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <InfoIcon className="inline h-3.5 w-3.5 ml-1 text-muted-foreground relative -top-px" />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p className="text-xs">
-                                                            Anomalies may be flagged for admin review.
-                                                        </p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        </label>
-                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

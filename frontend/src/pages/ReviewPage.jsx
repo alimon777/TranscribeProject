@@ -1,26 +1,95 @@
 import React, { useState, useEffect } from 'react';
-// MODIFIED: Import useParams to get the ID from the URL
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, CheckCircle, Trash2, FileEdit, Download, Save } from 'lucide-react';
+import { CheckCircle, Trash2, FileEdit, Download, Save } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton'; // Needed for the Skeleton component
 import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 import { usePopup } from '../components/PopupProvider';
-// MODIFIED: Import the new API function
+import StatusBadge, { TRANSCRIPTION_STATUSES } from '../components/StatusBadge';
 import {
     finalizeTranscriptionIntegration,
     getTranscriptionDetails,
-    deleteTranscription, // Optional, but good for a full "Discard" flow
+    deleteTranscription,
 } from '../services/apiClient';
 
-// MODIFIED: The component no longer receives props for data
+// --- Skeleton Component (Defined locally in this file) ---
+function ReviewPageSkeleton() {
+  return (
+    <div className="p-4 md:p-6 w-full animate-pulse">
+      {/* Header Skeleton */}
+      <div className="mb-6">
+        <Skeleton className="h-8 w-1/2 mb-2" />
+        <Skeleton className="h-5 w-2/3" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left Column Skeleton (Main Content) */}
+        <div className="lg:col-span-3 space-y-6">
+          <Skeleton className="h-12 w-full" /> {/* Banner Skeleton */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-1/3" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 border-b pb-3">
+                <Skeleton className="h-10 w-1/3" />
+                <Skeleton className="h-10 w-1/3" />
+              </div>
+              <Skeleton className="h-72 w-full mt-4" /> {/* Textarea Skeleton */}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column Skeleton (Info and Actions) */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+             <CardContent className="pt-6">
+              <div className="space-y-2 border-b pb-4 mb-4">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-1/3" />
+              </div>
+              <div>
+                <Skeleton className="h-5 w-1/4 mb-2" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-1/2" />
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// --- Main Page Component ---
 export default function ReviewPage() {
     const navigate = useNavigate();
-    const { id: transcriptionId } = useParams(); // Get the ID from the URL
+    const { id: transcriptionId } = useParams();
     const { confirm, alert } = usePopup();
 
-    // MODIFIED: Component now manages its own data, loading, and error states
     const [transcriptionData, setTranscriptionData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -34,19 +103,18 @@ export default function ReviewPage() {
 
     useEffect(() => {
         if (!transcriptionId) {
-            navigate('/upload'); // Redirect if no ID is present
+            navigate('/upload');
             return;
         }
 
         const fetchTranscription = async () => {
-            setIsLoading(true);
             setError(null);
             try {
                 const data = await getTranscriptionDetails(transcriptionId);
                 setTranscriptionData(data);
                 setEditedTranscription(data.transcript || '');
                 setEditedQuiz(data.quiz_content || '');
-                setProvisionContent(data.provison_content || '');
+                setProvisionContent(data.provision_content || '');
                 setHighlights(data.highlights || '');
             } catch (err) {
                 console.error("Failed to fetch transcription details:", err);
@@ -64,9 +132,9 @@ export default function ReviewPage() {
         const updateData = {
             transcript: editedTranscription,
             quiz_content: editedQuiz,
-            provison_content: provisionContent,
+            provision_content: provisionContent,
             highlights: highlights,
-            status: "Draft"
+            status: TRANSCRIPTION_STATUSES.DRAFT
         };
         try {
             await finalizeTranscriptionIntegration(transcriptionId, updateData);
@@ -85,10 +153,10 @@ export default function ReviewPage() {
         const updateData = {
             transcript: editedTranscription,
             quiz_content: editedQuiz,
-            provison_content: provisionContent,
+            provision_content: provisionContent,
             highlights: highlights,
             folder_id: folderId,
-            status: "Integrated"
+            status: TRANSCRIPTION_STATUSES.INTEGRATED
         };
         try {
             const res = await finalizeTranscriptionIntegration(
@@ -117,101 +185,136 @@ export default function ReviewPage() {
         }
     };
 
-    // Loading and Error states
     if (isLoading) {
-        return (
-            <div className="p-8 text-center flex justify-center items-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2">Loading Review Data...</span>
-            </div>
-        );
+        return <ReviewPageSkeleton />;
     }
 
-    if (error) {
-        return <div className="p-8 text-center text-red-600">{error}</div>;
-    }
+    if (error) { return <div className="p-8 text-center text-red-600">{error}</div>; }
+    if (!transcriptionData) { return null; }
 
-    if (!transcriptionData) {
-        return null; // Should not happen if loading/error states are handled
-    }
-
+    const isIntegrated = transcriptionData.status === TRANSCRIPTION_STATUSES.INTEGRATED;
+    const canFinalize = [TRANSCRIPTION_STATUSES.DRAFT, TRANSCRIPTION_STATUSES.AWAITING_APPROVAL].includes(transcriptionData.status);
+    const canSaveAsDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
+    
+    const tabCount = 1 + (provisionContent ? 1 : 0) + (editedQuiz ? 1 : 0);
+    const tabGridClass = `grid w-full grid-cols-${tabCount}`;
 
     return (
         <div className="p-4 md:p-6 w-full">
-            {/* ... The rest of the JSX is largely the same, just using `transcriptionData` ... */}
             <div className="mb-6">
-                <h1 className="text-3xl font-semibold mb-1">Review & Edit Generated Content</h1>
-                <p className="text-md text-muted-foreground">Review the processed content before finalizing its integration.</p>
+                {isIntegrated ? (
+                    <>
+                        <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
+                            <span>{transcriptionData.title}</span> 
+                            <StatusBadge status={transcriptionData.status} />
+                        </h1>
+                        <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span>{transcriptionData.folder_path}</span>
+                            <span>•</span>
+                            <span>{transcriptionData.source_file_name}</span>
+                            <span>•</span>
+                            <span>Processed on {new Date(transcriptionData.updated_date).toLocaleDateString()}</span>
+                            <span>•</span>
+                            <div className="flex flex-wrap gap-1">
+                                {transcriptionData.key_topics?.map((topic) => (
+                                    <Badge key={topic} variant="outline" className="text-xs">{topic}</Badge>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <h1 className="text-3xl font-semibold mb-1">Review & Edit Generated Content</h1>
+                        <p className="text-md text-muted-foreground">Review the processed content before finalizing its integration.</p>
+                    </>
+                )}
             </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <div className="lg:col-span-3 space-y-6">
-                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 text-green-700 dark:text-green-300 p-4 rounded-md shadow-sm">
-                        <CheckCircle className="h-5 w-5 text-green-700" />
-                        <p className="ml-2 text-sm text-green-700">Content ready for review.</p>
-                    </div>
-                    <Card>
-                        <CardHeader><CardTitle>Generated & Cleaned Transcription</CardTitle></CardHeader>
-                        <CardContent>
-                            <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={15} className="font-mono whitespace-pre-wrap" />
-                        </CardContent>
-                    </Card>
-                    {!!editedQuiz && (
-                        <Card>
-                            <CardHeader><CardTitle>Generated Quiz/Assignment</CardTitle></CardHeader>
-                            <CardContent>
-                                <Textarea value={editedQuiz} onChange={(e) => setEditedQuiz(e.target.value)} rows={8} className="font-mono whitespace-pre-wrap" />
-                            </CardContent>
-                        </Card>
+                    {!isIntegrated && transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL && (
+                        <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 text-green-700 dark:text-green-300 p-4 rounded-md shadow-sm">
+                            <CheckCircle className="h-5 w-5" />
+                            <p className="ml-2 text-sm font-medium">Content is ready for your review.</p>
+                        </div>
                     )}
+                    {!isIntegrated && transcriptionData.status === TRANSCRIPTION_STATUSES.DRAFT && (
+                        <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 text-yellow-800 dark:text-yellow-300 p-4 rounded-md shadow-sm">
+                            <FileEdit className="h-5 w-5" />
+                            <p className="ml-2 text-sm font-medium">This is a saved draft awaiting final integration.</p>
+                        </div>
+                    )}
+
                     <Card>
-                        <CardHeader><CardTitle>Content based on provision</CardTitle></CardHeader>
+                        <CardHeader><CardTitle>Content</CardTitle></CardHeader>
                         <CardContent>
-                            <Textarea value={provisionContent} onChange={(e) => setProvisionContent(e.target.value)} rows={15} className="font-mono whitespace-pre-wrap" />
+                            <Tabs defaultValue="transcription" className="w-full">
+                                <TabsList className={tabGridClass}>
+                                    <TabsTrigger value="transcription">Transcription</TabsTrigger>
+                                    {!!provisionContent && <TabsTrigger value="provision">Provision Content</TabsTrigger>}
+                                    {!!editedQuiz && <TabsTrigger value="quiz">Quiz/Assignment</TabsTrigger>}
+                                </TabsList>
+                                <TabsContent value="transcription" className="mt-4">
+                                    <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap" disabled={isIntegrated} />
+                                </TabsContent>
+                                {!!provisionContent && (
+                                    <TabsContent value="provision" className="mt-4">
+                                        <Textarea value={provisionContent} onChange={(e) => setProvisionContent(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap" disabled={isIntegrated} />
+                                    </TabsContent>
+                                )}
+                                {!!editedQuiz && (
+                                    <TabsContent value="quiz" className="mt-4">
+                                        <Textarea value={editedQuiz} onChange={(e) => setEditedQuiz(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap" disabled={isIntegrated} />
+                                    </TabsContent>
+                                )}
+                            </Tabs>
                         </CardContent>
                     </Card>
                 </div>
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
-                        <CardHeader><CardTitle>Session Information</CardTitle></CardHeader>
-                        <CardContent className="text-xs text-muted-foreground space-y-1.5">
-                            <div><strong>Title:</strong> {transcriptionData.title}</div>
-                            <div><strong>Purpose:</strong> {transcriptionData.purpose}</div>
-                            <div><strong>Topics:</strong> {transcriptionData.key_topics?.join(', ') || 'N/A'}</div>
-                            <div>
-                            <strong>Processing Time:</strong>{" "}
-                            {(() => {
-                                const start = new Date(transcriptionData.uploaded_date);
-                                const end = new Date(transcriptionData.updated_date);
-                                const diffInSeconds = Math.floor((end - start) / 1000);
-                                const minutes = Math.floor(diffInSeconds / 60);
-                                const seconds = diffInSeconds % 60;
-                                return `${minutes}m ${seconds}s`;
-                            })()}
-                            </div>
-                            <div><strong>Integrated In:</strong> {transcriptionData.folder_path}</div>
-                            <div><strong>Status:</strong> {transcriptionData.status}</div>
+                        <CardContent className="text-sm pt-6">
+                            {!isIntegrated && <>
+                                <div className="text-xs text-muted-foreground space-y-2 border-b pb-4 mb-4">
+                                    <div><strong>Title:</strong> {transcriptionData.title}</div>
+                                    <div><strong>Purpose:</strong> {transcriptionData.purpose}</div>
+                                    <div><strong>Topics:</strong> {transcriptionData.key_topics?.join(', ') || 'N/A'}</div>
+                                    <div className="flex items-center gap-2">
+                                        <strong>Status:</strong> <StatusBadge status={transcriptionData.status} />
+                                    </div>
+                                </div></>}
+                            {highlights && (
+                                <div >
+                                    <h4 className="font-semibold mb-2 text-primary">Highlights</h4>
+                                    <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlights}</ReactMarkdown>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
-                        <CardContent className="space-y-2.5">
-                            {!transcriptionData.folder_id
-                                && <Button size="sm" className="w-full" onClick={() => setIsFolderModalOpen(true)} disabled={isSaving}>
-                                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                    Save & Finalize Integration
+                    {!isIntegrated && (
+                        <Card>
+                            <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+                            <CardContent className="space-y-2.5">
+                                {canFinalize && (
+                                    <Button size="sm" className="w-full" onClick={() => setIsFolderModalOpen(true)} disabled={isSaving}>
+                                        Save & Finalize Integration
+                                    </Button>
+                                )}
+                                {canSaveAsDraft && (
+                                    <Button size="sm" variant="outline" className="w-full" onClick={handleSaveDraft} disabled={isSaving}>
+                                        Save as Draft
+                                    </Button>
+                                )}
+                                <Button size="sm" variant="outline" className="w-full" disabled><Download className="mr-2 h-4 w-4" />Download Content</Button>
+                                <Button size="sm" variant="destructive" className="w-full" onClick={handleDiscard} disabled={isSaving}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Discard
                                 </Button>
-                            }
-                            <Button size="sm" variant="outline" className="w-full" onClick={handleSaveDraft} disabled={isSaving}>
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileEdit className="mr-2 h-4 w-4" />}
-                                Save as Draft
-                            </Button>
-                            <Button size="sm" variant="outline" className="w-full" disabled><Download className="mr-2 h-4 w-4" />Download Content</Button>
-                            <Button size="sm" variant="destructive" className="w-full" onClick={handleDiscard} disabled={isSaving}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Discard
-                            </Button>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
             <IntegrationFolderDialog

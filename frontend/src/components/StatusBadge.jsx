@@ -2,45 +2,59 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+// A map of status constants for consistency and to avoid typos.
+export const TRANSCRIPTION_STATUSES = {
+  DRAFT: "Draft",
+  INTEGRATED: "Integrated",
+  ARCHIVED: "Archived",
+  PROCESSING: "Processing", 
+  AWAITING_APPROVAL: "Awaiting Approval", // Changed key for clarity
+  ERROR: "Error",
+};
+
 export default function StatusBadge ({ status }) {
-  const TRANSCRIPTION_STATUSES = {
-    DRAFT: "Draft",
-    INTEGRATED: "Integrated",
-    ARCHIVED: "Archived",
-    PROCESSING: "Processing", 
-    ERROR: "Error",
+  // A helper function could also be used here to map status to styles
+  const getStatusProps = () => {
+    switch (status) {
+      case TRANSCRIPTION_STATUSES.DRAFT:
+        return {
+          variant: "outline",
+          className: "text-yellow-600 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30",
+          text: "Draft",
+        };
+      case TRANSCRIPTION_STATUSES.INTEGRATED:
+        return {
+          variant: "default",
+          className: "text-green-700 border-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30",
+          text: "Integrated",
+        };
+      case TRANSCRIPTION_STATUSES.PROCESSING:
+        return {
+          variant: "secondary",
+          className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+          text: "Processing",
+          icon: <Loader2 className="h-3 w-3 mr-1 animate-spin" />,
+        };
+      case TRANSCRIPTION_STATUSES.AWAITING_APPROVAL:
+        return {
+          variant: "secondary",
+          className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+          text: "Awaiting Approval",
+        };
+      default:
+        return {
+          variant: "secondary",
+          text: status,
+        };
+    }
   };
 
-  switch (status) {
-    case TRANSCRIPTION_STATUSES.DRAFT:
-      return (
-        <Badge
-          variant="outline"
-          className="text-yellow-600 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30"
-        >
-          Draft
-        </Badge>
-      );
-    case TRANSCRIPTION_STATUSES.INTEGRATED:
-      return (
-        <Badge
-          variant="default"
-          className="text-green-600 border-green-500 bg-green-50 dark:bg-green-900/30"
-        >
-          Integrated
-        </Badge>
-      );
-    case TRANSCRIPTION_STATUSES.PROCESSING:
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-        >
-          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-          Processing
-        </Badge>
-      );
-    default:
-      return <Badge variant="secondary">{status}</Badge>;
-  }
+  const { variant, className, text, icon } = getStatusProps();
+
+  return (
+    <Badge variant={variant} className={className}>
+      {icon}
+      {text}
+    </Badge>
+  );
 };
