@@ -152,7 +152,7 @@ export default function TranscriptionPreview({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Download .txt</p>
+                  <p>Download pdf</p>
                 </TooltipContent>
               </Tooltip>
             </div>

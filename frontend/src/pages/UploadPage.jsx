@@ -31,6 +31,8 @@ export default function UploadPage({ setProcessedDataForReview }) {
     const [sessionPurpose, setSessionPurpose] = useState('');
     const [primaryTopic, setPrimaryTopic] = useState('');
     const [keywords, setKeywords] = useState('');
+    // MODIFIED: Added state to hold the validation error for keywords
+    const [keywordsError, setKeywordsError] = useState('');
     const [generateQuiz, setGenerateQuiz] = useState(false);
     const SESSION_PURPOSES = [
         "General Walkthrough/Overview",
@@ -39,15 +41,47 @@ export default function UploadPage({ setProcessedDataForReview }) {
         "Meeting Minutes",
         "Training Session",
         "Product Demo",
-      ];
+    ];
     const [isProcessing, setIsProcessing] = useState(false);
 
     const handleFileChange = (e) => {
         if (e.target.files?.[0]) setFile(e.target.files[0]);
     };
 
+    // MODIFIED: Added validation function for keywords
+    const validateKeywords = (text) => {
+        if (!text.trim()) return true; // Empty input is valid
+        
+        // This regex checks for a comma-separated list of "ACRONYM(Full Name)" entries.
+        // It allows spaces in the acronym and name, and handles an optional trailing comma.
+        const trimmedText = text.trim().replace(/,$/, '').trim();
+        if (!trimmedText) return true; // Input was only spaces or a comma
+
+        const pattern = /^[A-Z0-9\s]+\([^)]+\)(?:\s*,\s*[A-Z0-9\s]+\([^)]+\))*$/i;
+        return pattern.test(trimmedText);
+    };
+
+    // MODIFIED: Added a specific handler for the keywords textarea to perform validation
+    const handleKeywordsChange = (e) => {
+        const input = e.target.value;
+        setKeywords(input);
+
+        if (input && !validateKeywords(input)) {
+            setKeywordsError("Format must be: SHORTFORM(Full Form), NEXT(Full Form), ...");
+        } else {
+            setKeywordsError("");
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // MODIFIED: Added a check to prevent submission if keywords are invalid
+        if (keywordsError) {
+            alert('Please correct the keyword format before submitting.');
+            return;
+        }
+
         if (!file && !sessionTitle) {
             alert('Please provide a session title or upload a file.');
             return;
@@ -60,8 +94,8 @@ export default function UploadPage({ setProcessedDataForReview }) {
             formData.append("primaryTopic", primaryTopic);
             formData.append("source", file.name);
             formData.append("keywords", keywords);
-            formData.append("generateQuiz", generateQuiz.toString()); 
-            
+            formData.append("generateQuiz", generateQuiz.toString());
+
             createTranscription(formData, (data) => {
                 const transcriptionId = data.transcription_id;
             });
@@ -153,13 +187,14 @@ export default function UploadPage({ setProcessedDataForReview }) {
                                     <Textarea
                                         id="keywords"
                                         value={keywords}
-                                        onChange={(e) => setKeywords(e.target.value)}
-                                        placeholder={`Enter one term per line. e.g.,
-                    CSP (Cloud Service Provider),
-                    DB (DataBase),
-                    ISP (Internet Service Provider)`}
+                                        // MODIFIED: Use the new handler with validation
+                                        onChange={handleKeywordsChange}
+                                        // MODIFIED: Updated placeholder to match format
+                                        placeholder="e.g., CSP(Cloud Service Provider), DB(Database)"
                                         rows={5}
                                     />
+                                    {/* MODIFIED: Conditionally render the error message */}
+                                    {keywordsError && <p className="text-xs text-red-600 mt-1.5">{keywordsError}</p>}
                                     <p className="text-xs text-muted-foreground mt-1">
                                         This helps correct misinterpretations and ensures
                                         domain-specific terms are accurate.

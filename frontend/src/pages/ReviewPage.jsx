@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-// MODIFIED: Added ArrowLeft icon
 import { CheckCircle, Trash2, FileEdit, Download, Save, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -102,7 +101,8 @@ export default function ReviewPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [editedTranscription, setEditedTranscription] = useState('');
     const [editedQuiz, setEditedQuiz] = useState('');
-    const [provisionContent, setProvisionContent] = useState('');
+    // MODIFIED: State changed from string to object to handle key-value pairs
+    const [provisionContent, setProvisionContent] = useState({});
     const [highlights, setHighlights] = useState('');
 
     useEffect(() => {
@@ -118,7 +118,8 @@ export default function ReviewPage() {
                 setTranscriptionData(data);
                 setEditedTranscription(data.transcript || '');
                 setEditedQuiz(data.quiz_content || '');
-                setProvisionContent(data.provision_content || '');
+                // MODIFIED: Handle object for provision_content, default to empty object
+                setProvisionContent(data.provision_content || {});
                 setHighlights(data.highlights || '');
             } catch (err) {
                 console.error("Failed to fetch transcription details:", err);
@@ -130,6 +131,14 @@ export default function ReviewPage() {
 
         fetchTranscription();
     }, [transcriptionId, navigate]);
+
+    // MODIFIED: New handler to update a specific key in the provisionContent state
+    const handleProvisionChange = (key, value) => {
+        setProvisionContent(prev => ({
+            ...prev,
+            [key]: value
+        }));
+    };
 
     const handleSaveDraft = async () => {
         setIsSaving(true);
@@ -200,12 +209,11 @@ export default function ReviewPage() {
     const canFinalize = [TRANSCRIPTION_STATUSES.DRAFT, TRANSCRIPTION_STATUSES.AWAITING_APPROVAL].includes(transcriptionData.status);
     const canSaveAsDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
 
-    const tabCount = 1 + (provisionContent ? 1 : 0) + (editedQuiz ? 1 : 0);
-    const tabGridClass = `grid w-full grid-cols-${tabCount}`;
+    // MODIFIED: Removed dynamic grid class calculation as it's no longer needed and fragile.
+    const hasProvisionContent = provisionContent && Object.keys(provisionContent).length > 0;
 
     return (
         <div className="p-4 md:p-6 w-full">
-            {/* MODIFIED: Wrapped header in a flex container with the new back button */}
             <div className="mb-6 flex items-start gap-4">
                 <Button variant="outline" size="icon" onClick={() => navigate(-1)} className="flex-shrink-0 h-10 w-10 rounded-full mt-3" aria-label="Go back">
                     <ArrowLeft className="h-4 w-4" />
@@ -259,22 +267,34 @@ export default function ReviewPage() {
                         <CardHeader><CardTitle>Content</CardTitle></CardHeader>
                         <CardContent>
                             <Tabs defaultValue="transcription" className="w-full">
-                                <TabsList className={tabGridClass}>
+                                {/* MODIFIED: TabsList now renders dynamic tabs for provision content */}
+                                <TabsList className="h-auto flex-wrap">
                                     <TabsTrigger value="transcription">Transcription</TabsTrigger>
-                                    {!!provisionContent && <TabsTrigger value="provision">Provision Content</TabsTrigger>}
+                                    {hasProvisionContent && Object.keys(provisionContent).map(key => (
+                                        <TabsTrigger key={key} value={key}>{key}</TabsTrigger>
+                                    ))}
                                     {!!editedQuiz && <TabsTrigger value="quiz">Quiz/Assignment</TabsTrigger>}
                                 </TabsList>
                                 <TabsContent value="transcription" className="mt-4">
-                                    <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap" disabled={isIntegrated} />
+                                    <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={20} className="max-h-[100vh] font-mono whitespace-pre-wrap" disabled={isIntegrated} />
                                 </TabsContent>
-                                {!!provisionContent && (
-                                    <TabsContent value="provision" className="mt-4">
-                                        <Textarea value={provisionContent} onChange={(e) => setProvisionContent(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap" disabled={isIntegrated} />
+                                
+                                {/* MODIFIED: Dynamically render TabsContent for each provision item */}
+                                {hasProvisionContent && Object.entries(provisionContent).map(([key, value]) => (
+                                    <TabsContent key={key} value={key} className="mt-4">
+                                        <Textarea
+                                            value={value || ''} // Use empty string for null values to avoid React errors
+                                            onChange={(e) => handleProvisionChange(key, e.target.value)}
+                                            rows={20}
+                                            className="font-mono whitespace-pre-wrap max-h-[100vh]"
+                                            disabled={isIntegrated}
+                                        />
                                     </TabsContent>
-                                )}
+                                ))}
+                                
                                 {!!editedQuiz && (
                                     <TabsContent value="quiz" className="mt-4">
-                                        <Textarea value={editedQuiz} onChange={(e) => setEditedQuiz(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap" disabled={isIntegrated} />
+                                        <Textarea value={editedQuiz} onChange={(e) => setEditedQuiz(e.target.value)} rows={20} className="font-mono whitespace-pre-wrap max-h-[100vh]" disabled={isIntegrated} />
                                     </TabsContent>
                                 )}
                             </Tabs>
