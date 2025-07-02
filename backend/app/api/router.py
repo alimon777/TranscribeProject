@@ -148,7 +148,7 @@ class FullTranscriptionResponse(BaseModel):
     # Extra fields added in the route
     folder_path: Optional[str]
     quiz_content: Optional[str]
-    provision_content: Optional[str]
+    provision_content: Optional[Dict[str, Optional[str]]]
 
     class Config:
         orm_mode = True
@@ -468,11 +468,11 @@ def get_transcriptions(
     for t in transcriptions:
         folder_path = build_folder_path(t.folder, db) if t.folder else ""
         transcription_data = jsonable_encoder(t)
-        t["folder_path"] = folder_path
-        t["quiz_content"] = t.quiz.quiz_content if t.quiz else None
-        t["provision_content"] = {}
-        t["provision_content"][t.purpose] = t.session_detail.provison_content if t.session_detail else None
-        response.append(t)
+        transcription_data["folder_path"] = folder_path
+        transcription_data["quiz_content"] = t.quiz.quiz_content if t.quiz else None
+        transcription_data["provision_content"] = {}
+        transcription_data["provision_content"][t.purpose] = t.session_detail.provison_content if t.session_detail else None
+        response.append(transcription_data)
 
     return response
 
@@ -538,7 +538,8 @@ async def get_transcription(transcription_id: int):
         transcription_data = jsonable_encoder(transcription)
         transcription_data["folder_path"] = build_folder_path(folder, db) if folder else None
         transcription_data["quiz_content"] = quiz.quiz_content if quiz else None
-        transcription_data["provision_content"] = session_detail.provison_content if session_detail else None
+        transcription_data["provision_content"] = {}
+        transcription_data["provision_content"][transcription.purpose] = session_detail.provison_content if session_detail else None
 
         return transcription_data
 
