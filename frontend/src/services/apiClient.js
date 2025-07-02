@@ -111,8 +111,13 @@ export const updateTranscription = (metadata) => {
   return apiClient.post("/transcribe/cleanup", metadata); 
 }
 
-export const relocateTranscription = (data) => {
-  return apiClient.put("/reloacte/transcription", data);
-}
+export const relocateTranscription = (transcriptionId, folderId) => {
+  return apiClient.put("/reloacte/transcription", null, {
+    params: {
+      transcription_id: transcriptionId,
+      folder_id: folderId,
+    },
+  });
+};
 
 export default apiClient;

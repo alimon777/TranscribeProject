@@ -26,6 +26,7 @@ import {
   resolveConflict,
 } from '../services/apiClient';
 
+import CardIllustration from '@/svg_components/CardsIllustration';
 // Define string constants based on backend enums (values must match backend)
 const LOCAL_ANOMALY_TYPES = {
   SEMANTIC_DIFFERENCE: "Semantic Difference",
@@ -57,8 +58,8 @@ export default function AdminDashboardPage() {
     // console.log("AdminDashboardPage useEffect running"); // For debugging StrictMode
     setIsLoading(true);
     getAdminConflicts() // This function name in apiClient.js maps to /admin/conflicts GET
-      .then((data) => { 
-        setConflicts(data.conflicts || []); 
+      .then((data) => {
+        setConflicts(data.conflicts || []);
         setApiStats(data.stats || { pending: 0, resolved: 0, rejected: 0, total: 0 });
         setIsLoading(false);
       })
@@ -101,7 +102,7 @@ export default function AdminDashboardPage() {
 
     const payload = {
       resolution_content: chosenContent,
-      status: LOCAL_CONFLICT_STATUSES.RESOLVED_MERGED 
+      status: LOCAL_CONFLICT_STATUSES.RESOLVED_MERGED
     };
 
     resolveConflict(detail.id, payload)
@@ -112,11 +113,11 @@ export default function AdminDashboardPage() {
         setConflicts((prev) =>
           prev.map((c) =>
             c.id === resolvedConflictData.id // Use ID from resolved_conflict
-              ? { ...c, status: resolvedConflictData.status, resolution_content: resolvedConflictData.resolution_content } 
+              ? { ...c, status: resolvedConflictData.status, resolution_content: resolvedConflictData.resolution_content }
               : c
           )
         );
-        
+
         // Update stats directly from the resolveConflict response
         setApiStats(newStats || { pending: 0, resolved: 0, rejected: 0, total: 0 });
 
@@ -131,7 +132,7 @@ export default function AdminDashboardPage() {
   };
 
   // ... (rest of the component JSX remains the same)
-  if (isLoading && conflicts.length === 0) { 
+  if (isLoading && conflicts.length === 0) {
     return (
       <div className="p-8">
         <Skeleton className="h-6 w-1/3 mb-4" />
@@ -197,12 +198,12 @@ export default function AdminDashboardPage() {
                     else if (c.status && c.status.startsWith('Resolved'))
                       statusClass += 'bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300';
                     else if (c.status && c.status.startsWith('Rejected'))
-                       statusClass += 'bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300';
+                      statusClass += 'bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300';
                     else statusClass += 'bg-gray-100 text-gray-600';
 
                     return (
-                      <TableRow 
-                        key={c.id} 
+                      <TableRow
+                        key={c.id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => openConflict(c.id)}
                       >
@@ -236,7 +237,7 @@ export default function AdminDashboardPage() {
                               openConflict(c.id);
                             }}
                           >
-                            <Ellipsis size={12}/> 
+                            <Ellipsis size={12} />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -245,11 +246,14 @@ export default function AdminDashboardPage() {
                 </TableBody>
               </Table>
             </div>
-             {isLoading && conflicts.length > 0 && ( 
-                <div className="p-4 text-center text-sm text-muted-foreground">Refreshing list...</div>
+            {isLoading && conflicts.length > 0 && (
+              <div className="p-4 text-center text-sm text-muted-foreground">Refreshing list...</div>
             )}
             {!isLoading && conflicts.length === 0 && (
-                <div className="p-4 text-center text-muted-foreground">No conflicts found.</div>
+              <div className='flex-row justify-items-center'>
+                <CardIllustration className='h-30 w-30'/>
+                <div className="text-muted-foreground -mt-7 text-sm">No conflicts found.</div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -289,10 +293,9 @@ export default function AdminDashboardPage() {
                   </div>
                   {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                     <div className="flex justify-end mt-2">
-                      <span 
-                        className={`text-sm cursor-pointer hover:underline ${
-                          chosenContent === detail.existing_content_snippet ? 'text-primary font-medium' : 'text-primary'
-                        }`}
+                      <span
+                        className={`text-sm cursor-pointer hover:underline ${chosenContent === detail.existing_content_snippet ? 'text-primary font-medium' : 'text-primary'
+                          }`}
                         onClick={() => setChosenContent(detail.existing_content_snippet || '')}
                       >
                         Keep Existing
@@ -311,10 +314,9 @@ export default function AdminDashboardPage() {
                   </div>
                   {detail.status === LOCAL_CONFLICT_STATUSES.PENDING && (
                     <div className="flex justify-end mt-2">
-                       <span 
-                        className={`text-sm cursor-pointer hover:underline ${
-                          chosenContent === detail.new_content_snippet ? 'text-primary font-medium' : 'text-primary'
-                        }`}
+                      <span
+                        className={`text-sm cursor-pointer hover:underline ${chosenContent === detail.new_content_snippet ? 'text-primary font-medium' : 'text-primary'
+                          }`}
                         onClick={() => setChosenContent(detail.new_content_snippet || '')}
                       >
                         Accept Incoming
@@ -344,7 +346,7 @@ export default function AdminDashboardPage() {
                   </>
                 )}
               </div>
-              
+
               <DialogFooter className="flex justify-end space-x-2 pt-0">
                 <DialogClose asChild>
                   <Button variant="outline">Cancel</Button>
@@ -361,9 +363,9 @@ export default function AdminDashboardPage() {
             </>
           )}
           {!isDetailLoading && !detail && (
-             <div className="p-4 text-center text-muted-foreground">
-                Could not load conflict details.
-             </div>
+            <div className="p-4 text-center text-muted-foreground">
+              Could not load conflict details.
+            </div>
           )}
         </DialogContent>
       </Dialog>

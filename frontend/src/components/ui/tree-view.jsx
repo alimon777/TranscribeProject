@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
+import NoFile from '@/svg_components/NoFile';
 
 const TreeItem = React.memo(({
   item,
@@ -50,7 +51,7 @@ const TreeItem = React.memo(({
   const isExpanded = allExpandedIds.has(item.id);
   const isSelected = currentSelectedId === item.id;
   const isRenaming = currentRenamingId === item.id;
-  const isAdding  = currentAddingUnderParentId === item.id;
+  const isAdding = currentAddingUnderParentId === item.id;
 
   useEffect(() => {
     if (isRenaming && renameRef.current) {
@@ -149,7 +150,7 @@ const TreeItem = React.memo(({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => onDeleteNode(item.id)}
+                onClick={() => onDeleteNode(item.id, item.name)}
                 className="text-destructive"
               >
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
@@ -262,9 +263,9 @@ export const TreeView = ({
     await onNodeAddCommit?.(pid, name, propId, [...path, name]);
   };
 
-  const deleteNode = async (id) => {
+  const deleteNode = async (id, name) => {
     cancelAll();
-    await onNodeDeleteCommit?.(id);
+    await onNodeDeleteCommit?.(id, name);
   };
 
   const onNewNameChange = v => setNewNameVal(v);
@@ -319,9 +320,18 @@ export const TreeView = ({
         </div>
       )}
 
-      <ul role="tree">
-        {renderTree(data, 0)}
-      </ul>
+      {data && data.length > 0 ? (
+        <ul role="tree">
+          {renderTree(data, 0)}
+        </ul>
+      ) : (
+        <div className='flex-row justify-items-center mt-22'>
+          <NoFile className='h-20 w-20 mb-5' />
+          <div className="text-muted-foreground text-sm">
+            No folders available.
+          </div>
+        </div>
+      )}
     </div>
   );
 };

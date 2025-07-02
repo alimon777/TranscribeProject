@@ -1,4 +1,6 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Card,
   CardHeader,
@@ -14,12 +16,16 @@ import {
   Move,
   Download,
 } from 'lucide-react';
-import StatusBadge from './StatusBadge';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export default function TranscriptionPreview({
   transcription,
-  folderName,
   onClose,
   onExpand,
   onDelete,
@@ -39,7 +45,7 @@ export default function TranscriptionPreview({
                 {transcription.source_file_name}
               </CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0" aria-label="Close preview">
               <XCircle className="h-4 w-4" />
             </Button>
           </div>
@@ -67,49 +73,91 @@ export default function TranscriptionPreview({
                   {topic}
                 </Badge>
               ))}
+              {(transcription.key_topics || []).length === 0 && <span className="text-xs text-muted-foreground">N/A</span>}
             </div>
           </div>
+
           <div>
-            <div className="text-xs font-medium mb-2">Content</div>
-            <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded text-left max-h-32 overflow-y-auto">
-              {transcription.transcript?.substring(0, 200)}...
+            <div className="text-xs font-medium mb-2">Highlights</div>
+            <div className="relative">
+              <div className="prose dark:prose-invert text-xs max-w-none text-muted-foreground bg-muted/30 p-2 rounded max-h-32 overflow-y-auto prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {transcription.highlights || "No highlights available."}
+                </ReactMarkdown>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={onExpand}
-            >
-              <SquareArrowOutUpRight className="h-4 w-4 mr-1" />
-              Preview
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={onDelete}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={onMove}
-            >
-              <Move className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={onDownload}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </div>
+          
+          {/* MODIFIED: Wrap buttons in TooltipProvider */}
+          <TooltipProvider>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 py-[18px]"
+                onClick={onExpand}
+              >
+                <SquareArrowOutUpRight className="h-4 w-4 mr-1" />
+                Preview
+              </Button>
+
+              {/* Delete Button with Tooltip */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={onDelete}
+                    aria-label="Delete transcription"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Delete Transcription</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Move Button with Tooltip */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={onMove}
+                    aria-label="Move to folder"
+                  >
+                    <Move className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Move to Folder</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Download Button with Tooltip */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={onDownload}
+                    aria-label="Download as text file"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Download pdf</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+
         </CardContent>
       </Card>
     </div>
