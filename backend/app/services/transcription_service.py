@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.output_parsers import JsonOutputParser
 from typing import List
-from api.router import update_transcription
+from api.router import create_provision, create_quiz, update_transcription
 
 ffmpeg_path = settings.FFMPEG_PATH
 
@@ -30,9 +30,16 @@ class transcriptParser(BaseModel):
     highlights: List[str] = Field(description="short bullet-point highlights extracted from the transcript chunk.")
 parser = JsonOutputParser(pydantic_object=transcriptParser)
 
-# class highlightParser(BaseModel):
-#     highlights: List[str] = Field(description="Final list of summarized highlights")
-# list_parser = JsonOutputParser(pydantic_object=highlightParser)
+class QuizItem(BaseModel):
+    question: str
+    choices: List[str]
+    correct_answer: str
+
+class ChunkAnalysisOutput(BaseModel):
+    provision_content: str
+    quiz: List[QuizItem]
+
+provision_parser = JsonOutputParser(pydantic_object=ChunkAnalysisOutput)
 
 transcriptPrompt = PromptTemplate(
     template="""
@@ -107,6 +114,7 @@ def transcribe_audio_file(audio_file_url):
                 response = requests.get(
                     transcription_files_url, headers=headers, verify=False
                 )
+                print(f"Response (Attempt {attempt + 1}):", response.json())
                 if response.status_code == 200:
                     files_data = response.json()
                     if files_data.get("values"):
@@ -354,6 +362,8 @@ async def generate_cleantranscription(transcription):
 
             Highlights:
             {chunk_highlights}
+
+            - do not add markdown to the response, and do not start or end with ```.
             """,
                 input_variables=["chunk_highlights"]
             )
@@ -368,4 +378,61 @@ async def generate_cleantranscription(transcription):
         "cleaned_transcription": final_cleaned_transcript,
         "final_highlights": final_highlight_response.content if final_highlight_response else "",
     }
+
+async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
+    chunks = splitter.split_text(transcription)
+
+    prompt = PromptTemplate(
+        template="""
+        You are an AI assistant analyzing a transcript chunk from a "{session_purpose}" session.
+
+        You are also given previously generated `provision_content` from earlier chunks. Use them to synthesize a refined, high-level final label that represents the overall content and purpose of the full session so far, including this latest chunk.
+
+        Your task:
+        - Generate a single, updated `provision_content` that is concise, specific, and **captures the essence of the entire session** — including this chunk.
+        - Generate 2–3 quiz questions based on this chunk.
+        - Each question must have:
+            - `question`: a concise question string
+            - `choices`: a list of 3–5 answer options
+            - `correct_answer`: the correct answer from the choices
+
+        **Important**:
+        - Do **not** use markdown formatting.
+        - Do **not** include triple backticks (```).
+        - Output must strictly follow the JSON format below.
+
+        {format_instructions}
+
+        Session Purpose: {session_purpose}
+
+        Previous provision labels: {prior_provisions}
+
+        Latest Transcript Chunk:
+        {chunk}
+        """,
+        input_variables=["session_purpose", "prior_provisions", "chunk"],
+        partial_variables={"format_instructions": provision_parser.get_format_instructions()},
+    )
+    chain = prompt | model | provision_parser
+
+    all_quizzes = []
+    provision_content = ""
+    for i, chunk in enumerate(chunks):
+        result = await chain.ainvoke({
+        "session_purpose": sessionPurpose,
+        "prior_provisions": provision_content,
+        "chunk": chunk
+        })
+        print("processed chunk", i, result.get("quiz"))
+        provision_content = result.get("provision_content")
+        all_quizzes.extend(result.get("quiz"))
+    
+    if generate_quiz:
+        create_quiz(transcription_id, all_quizzes)
+    print("provision_content", provision_content)
+    if sessionPurpose.strip():
+        create_provision(transcription_id, provision_content)
+    
+    return provision_content
 

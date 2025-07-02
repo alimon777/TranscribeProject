@@ -74,6 +74,7 @@ export const getRepositoryData = (params) => {
 };
 
 export const deleteTranscription = (transcriptionId) => {
+  console.log("transcription id for delete", transcriptionId);
   return apiClient.delete(`/transcriptions/${transcriptionId}`);
 };
 

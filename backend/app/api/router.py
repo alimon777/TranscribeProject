@@ -1,9 +1,11 @@
+import json
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import (
     JSON, asc, case, create_engine, Column, Integer, String, Text,
     DateTime, ForeignKey, desc, func, event, or_
 )
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, backref, joinedload, selectinload
 from sqlalchemy.orm.attributes import get_history
 from sqlalchemy.orm import attributes as orm_attributes
@@ -52,30 +54,33 @@ class Quiz(Base):
     __tablename__ = "quiz"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     transcription_id = Column(Integer, ForeignKey("transcriptions.id", ondelete="CASCADE"), nullable=False)
-    quiz_content = Column(Text, nullable=True)
+    question = Column(Text, nullable=False)
+    choices = Column(Text, nullable=False)
+    correct_answer = Column(Text, nullable=False) 
     transcription = relationship("Transcription", back_populates="quiz")
 class SessionDetail(Base):
     __tablename__ = "session_details"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     transcription_id = Column(Integer, ForeignKey("transcriptions.id", ondelete="CASCADE"), nullable=False)
-    provison_content = Column(String(255), nullable=True)
+    provision_content = Column(LONGTEXT, nullable=True)
     transcription = relationship("Transcription", back_populates="session_detail")
 class Transcription(Base):
     __tablename__ = "transcriptions"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(500), nullable=False)
     source_file_name = Column(String(500), nullable=True)
-    highlights = Column(Text, nullable=True)
+    highlights = Column(LONGTEXT, nullable=True)
     status = Column(String(50), nullable=False, default=TranscriptionStatusEnum.PROCESSING)
-    transcript= Column(Text, nullable=True)
+    transcript= Column(LONGTEXT, nullable=True)
     key_topics = Column(JSON, nullable=True)
     uploaded_date = Column(DateTime, default=func.now())
     updated_date = Column(DateTime, default=func.now(), onupdate=func.now())
     purpose = Column(String(255), nullable=True)
     folder_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=True)
     folder = relationship("Folder", back_populates="transcriptions")
-    quiz = relationship("Quiz", back_populates="transcription", uselist=False)
-    session_detail = relationship("SessionDetail", back_populates="transcription", uselist=False)
+    quiz = relationship("Quiz", back_populates="transcription", cascade="all, delete-orphan")
+    session_detail = relationship("SessionDetail", back_populates="transcription", uselist=False, cascade="all, delete-orphan")
+    conflicts = relationship("Conflict", back_populates="transcription", cascade="all, delete-orphan")
 class Conflict(Base):
     __tablename__ = "conflicts"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -87,6 +92,11 @@ class Conflict(Base):
     status = Column(String(100), nullable=False, default=ConflictStatusEnum.PENDING)
     updated_date = Column(DateTime, default=func.now())
     resolution_content = Column(Text, nullable=True)
+    transcription = relationship(
+        "Transcription",
+        back_populates="conflicts",
+        foreign_keys=[new_transcription_id]
+    )
 
 # --- DB Dependency and Event Listeners (Unchanged) ---
 def get_db():
@@ -132,6 +142,11 @@ class TranscriptionResponse(BaseModel):
     class Config:
         orm_mode = True
 
+class QuizItem(BaseModel):
+    question: str
+    choices: List[str]
+    correct_answer: str
+
 class FullTranscriptionResponse(BaseModel):
     id: int
     title: str
@@ -147,7 +162,7 @@ class FullTranscriptionResponse(BaseModel):
 
     # Extra fields added in the route
     folder_path: Optional[str]
-    quiz_content: Optional[str]
+    quiz_content: List[QuizItem]
     provision_content: Optional[Dict[str, Optional[str]]]
 
     class Config:
@@ -155,27 +170,11 @@ class FullTranscriptionResponse(BaseModel):
 
 class FinalizeIntegrationRequest(BaseModel):
     transcript: Optional[str] = None
-    quiz_content: Optional[str] = None
-    provison_content: Optional[str] = None
+    quiz_content: Optional[List[QuizItem]] = None
+    provision_content: Optional[Dict[str, str]] = None
     highlights: Optional[str] = None
     folder_id: Optional[int] = None
     status: Optional[str] = None
-
-class QuizResponse(BaseModel):
-    id: int
-    transcription_id: int
-    quiz_content: Optional[str]
-
-    class Config:
-        orm_mode = True
-
-class SessionDetailResponse(BaseModel):
-    id: int
-    transcription_id: int
-    provison_content: Optional[str]
-
-    class Config:
-        orm_mode = True
 
 class ConflictResponse(BaseModel):
     id: int
@@ -317,6 +316,7 @@ def finalize_transcription_integration(
     data: FinalizeIntegrationRequest,
     db: Session = Depends(get_db),
 ):
+    print("data is ", data)
     transcription = db.query(Transcription).get(transcription_id)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
@@ -324,12 +324,20 @@ def finalize_transcription_integration(
     if data:
         transcription.transcript = data.transcript
         transcription.highlights = data.highlights
-        quiz = db.query(Quiz).filter(Quiz.transcription_id == transcription_id).first()
-        if quiz:
-            quiz.quiz_content = data.quiz_content
+        if data.quiz_content is not None:
+            db.query(Quiz).filter(Quiz.transcription_id == transcription_id).delete()
+            for item in data.quiz_content:
+                quiz = Quiz(
+                    transcription_id=transcription_id,
+                    question=item.question,
+                    choices=json.dumps(item.choices),
+                    correct_answer=item.correct_answer
+                )
+                db.add(quiz)
         sessiondetail = db.query(SessionDetail).filter(SessionDetail.transcription_id == transcription_id).first()
         if sessiondetail:
-            sessiondetail.provison_content = data.provison_content
+            provision_value = next(iter(data.provision_content.values()), "")
+            sessiondetail.provision_content = provision_value
         if(data.status == TranscriptionStatusEnum.INTEGRATED):
             folder = db.query(Folder).get(data.folder_id)
             if not folder:
@@ -352,10 +360,10 @@ def finalize_transcription_integration(
 
 @router.delete("/transcriptions/{transcription_id}")
 def delete_transcription(transcription_id: int, db: Session = Depends(get_db)):
+    print("deletd id for trans", transcription_id)
     transcription = db.query(Transcription).get(transcription_id)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
-
     db.delete(transcription)
     db.commit()
 
@@ -433,7 +441,7 @@ def get_transcriptions(
                 func.lower(Transcription.transcript).like(lowered),
                 func.lower(Transcription.key_topics).like(lowered),
                 Transcription.session_detail.has(
-                    func.lower(SessionDetail.provison_content).like(lowered)
+                    func.lower(SessionDetail.provision_content).like(lowered)
                 )
             )
         )
@@ -469,9 +477,16 @@ def get_transcriptions(
         folder_path = build_folder_path(t.folder, db) if t.folder else ""
         transcription_data = jsonable_encoder(t)
         transcription_data["folder_path"] = folder_path
-        transcription_data["quiz_content"] = t.quiz.quiz_content if t.quiz else None
+        transcription_data["quiz_content"] = [
+            {
+                "question": quiz.question,
+                "choices": json.loads(quiz.choices),  # assuming it's stored as JSON string
+                "correct_answer": quiz.correct_answer
+            }
+            for quiz in t.quiz
+        ] if t.quiz else []
         transcription_data["provision_content"] = {}
-        transcription_data["provision_content"][t.purpose] = t.session_detail.provison_content if t.session_detail else None
+        transcription_data["provision_content"][t.purpose] = t.session_detail.provision_content if t.session_detail else None
         response.append(transcription_data)
 
     return response
@@ -481,6 +496,8 @@ def create_transcription(title: str, purpose: str, key_topics: str, source: str)
     db: Session = SessionLocal()
     try:
         key_topics_list = [topic.strip() for topic in key_topics.split(',') if topic.strip()]
+        if title is None:
+            title = source
         transcription = Transcription(
             title=title,
             purpose=purpose,
@@ -493,6 +510,7 @@ def create_transcription(title: str, purpose: str, key_topics: str, source: str)
         db.add(transcription)
         db.flush()
         db.commit()
+        db.refresh(transcription)
         return {"message": "Transcription created", "id": transcription.id}
 
     except Exception as e:
@@ -502,15 +520,27 @@ def create_transcription(title: str, purpose: str, key_topics: str, source: str)
         db.close()
 
 @router.post("/update/transcription")
-def update_transcription(transcription_id: int, transcription_text: str, highlights: str):
+def update_transcription(transcription_id: int, transcription_text: str, highlights: str, quiz: str, provision: str):
     db: Session = SessionLocal()
     try:
         transcription = db.query(Transcription).get(transcription_id)
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
-    
-        transcription.transcript = transcription_text
-        transcription.highlights = highlights
+        if transcription_text:
+            transcription.transcript = transcription_text
+        if highlights:
+            transcription.highlights = highlights
+        if quiz:
+            quiz = db.query(Quiz).filter(Quiz.transcription_id == transcription_id).first()
+            if not quiz:
+                create_quiz(transcription_id, quiz)
+            else:    
+                quiz.quiz_content = quiz
+        if provision:
+            sessiondetail = db.query(SessionDetail).filter(SessionDetail.transcription_id == transcription_id).first()
+            if not sessiondetail:
+                create_provision(transcription_id, provision)
+
         transcription.status = TranscriptionStatusEnum.AWAITING
         db.commit()
         db.refresh(transcription)
@@ -525,21 +555,28 @@ def update_transcription(transcription_id: int, transcription_text: str, highlig
 async def get_transcription(transcription_id: int):
     db: Session = SessionLocal()
     try:
-        transcription = db.query(Transcription).get(transcription_id)
+        transcription = db.query(Transcription).options(
+            joinedload(Transcription.folder),
+            joinedload(Transcription.quiz),
+            joinedload(Transcription.session_detail),
+        ).get(transcription_id)
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
-
-        # Safely fetch related data
-        folder = db.query(Folder).get(transcription.folder_id) if transcription.folder_id else None
-        quiz = db.query(Quiz).filter(Quiz.transcription_id == transcription.id).first()
-        session_detail = db.query(SessionDetail).filter(SessionDetail.transcription_id == transcription.id).first()
-
+        
         # Convert transcription to dict and add extra fields
         transcription_data = jsonable_encoder(transcription)
-        transcription_data["folder_path"] = build_folder_path(folder, db) if folder else None
-        transcription_data["quiz_content"] = quiz.quiz_content if quiz else None
-        transcription_data["provision_content"] = {}
-        transcription_data["provision_content"][transcription.purpose] = session_detail.provison_content if session_detail else None
+        transcription_data["folder_path"] = build_folder_path(transcription.folder, db) if transcription.folder else None
+        transcription_data["quiz_content"] = [
+            {
+                "question": q.question,
+                "choices": json.loads(q.choices),
+                "correct_answer": q.correct_answer
+            }
+            for q in transcription.quiz
+        ] if transcription.quiz else []
+        transcription_data["provision_content"] = {
+            transcription.purpose: transcription.session_detail.provision_content if transcription.session_detail else ""
+        }
 
         return transcription_data
 
@@ -560,3 +597,42 @@ def relocate_transcription(transcription_id: str, folder_id: str,db: Session = D
     db.commit()
     db.refresh(transcription)
     return {"message": f"File: {transcription.title} moved successfully"}
+
+@router.post("/create/quiz")
+def create_quiz(transcription_id: str, quiz_content: List[dict]):
+    db: Session = SessionLocal()
+    try:
+        for i in quiz_content:
+            quiz = Quiz(
+                transcription_id = transcription_id,
+                question = i.get("question"),
+                choices=json.dumps(i.get("choices")),
+                correct_answer = i.get("correct_answer")
+            )
+            db.add(quiz)
+        db.commit()
+        db.refresh(quiz)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.post("/create/provision")
+def create_provision(transcription_id: str, content: str):
+    db: Session = SessionLocal()
+    try:
+        provision = SessionDetail(
+            transcription_id = transcription_id,
+            provision_content = content
+        )
+        db.add(provision)
+        db.flush()
+        db.commit()
+        db.refresh(provision)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+

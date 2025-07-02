@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import shutil
 import tempfile
 import uuid
@@ -7,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, File, UploadFile, HTTPException,
 from fastapi.responses import JSONResponse
 import threading
 from api.router import create_transcription, update_transcription, get_transcription
-from services.transcription_service import convert_video_to_audio, process_audio_file, split_and_transcribe, generate_cleantranscription
+from services.transcription_service import convert_video_to_audio, generate_quiz_logic, process_audio_file, split_and_transcribe, generate_cleantranscription
 
 
 transcribe_router = APIRouter()
@@ -65,6 +66,9 @@ async def full_transcription_pipeline(
     keywords: str,
     generate_quiz: bool,
 ):
+    print(generate_quiz)
+    if generate_quiz:
+        print("printing", generate_quiz)
     try:
         valid_video_formats = ["video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo"]
         valid_audio_formats = ["audio/wav", "audio/mp3", "audio/mpeg", "audio/ogg"]
@@ -73,7 +77,8 @@ async def full_transcription_pipeline(
             with open(temp_path, "rb") as file_obj:
                 processed_file_path = convert_video_to_audio(file_obj)
         elif content_type.startswith("audio/") or content_type in valid_audio_formats:
-            processed_file_path = process_audio_file(temp_path)
+            with open(temp_path, "rb") as file_obj:
+                processed_file_path = process_audio_file(file_obj)
         else:
             raise Exception(f"Unsupported media format: {content_type}")
 
@@ -81,21 +86,38 @@ async def full_transcription_pipeline(
             raise Exception("Failed to process media file")
         
         result = split_and_transcribe(processed_file_path)
-        print(update_transcription(transcription_id,result,None))
+        print(update_transcription(transcription_id,result,None, None, None))
         os.remove(processed_file_path)
 
         cleaned_response = await generate_cleantranscription(result)
+        cleaned_transcription = cleaned_response.get("cleaned_transcription")
 
+        pattern = r'\b([A-Za-z0-9]+)\(([^)]+)\)'
+        matches = re.findall(pattern, keywords)
+        shortform_map = {short.strip(): full.strip() for short, full in matches}
+        def replace_match(match):
+            word = match.group(0)
+            return shortform_map.get(word, word)
+
+        regex = r'\b(' + '|'.join(re.escape(k) for k in shortform_map.keys()) + r')\b'
+        transcription = re.sub(regex, replace_match, cleaned_transcription)
         update_transcription(
             transcription_id,
-            cleaned_response.get("cleaned_transcription"),
+            transcription,
             cleaned_response.get("final_highlights"),
+            None,None
         )
 
-        # if generate_quiz:
-        #     await generate_quiz_logic(transcription_id, keywords, cleaned_response)
+        if generate_quiz or sessionPurpose.strip():
+            await generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz)
 
         print(f"Transcription {transcription_id} pipeline complete.")
 
     except Exception as e:
         print(f"[ERROR] Transcription pipeline failed: {e}")
+
+@transcribe_router.get("/tester/tesing")
+async def testing():
+    transcription = await get_transcription(28)
+    await generate_quiz_logic(transcription["id"], transcription["transcript"], "Requirements Gathering", True)
+    return 0
