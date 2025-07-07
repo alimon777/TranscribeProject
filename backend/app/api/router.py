@@ -11,7 +11,6 @@ from sqlalchemy.orm.attributes import get_history
 from sqlalchemy.orm import attributes as orm_attributes
 from sqlalchemy.future import select
 
-# Assuming core.config.settings is defined elsewhere
 from core.config import settings
 
 from datetime import datetime
@@ -19,6 +18,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 
 from pydantic import BaseModel, Field, model_validator, ConfigDict
+from services.chains import summarize_chain, conflict_chain
 
 # --- Enums (Unchanged) ---
 class SessionPurposeEnum:
@@ -311,19 +311,39 @@ def get_review_history(db: Session = Depends(get_db)):
     return latest_three
 
 @router.put("/transcriptions/{transcription_id}/finalize-integration")
-def finalize_transcription_integration(
+async def finalize_transcription_integration(
     transcription_id: int,
     data: FinalizeIntegrationRequest,
     db: Session = Depends(get_db),
 ):
-    print("data is ", data)
     transcription = db.query(Transcription).get(transcription_id)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
+    hasConflicts = False
     if data:
         transcription.transcript = data.transcript
         transcription.highlights = data.highlights
+        if data.folder_id:
+            other_transcripts = db.query(Transcription).filter(
+                Transcription.folder_id == data.folder_id,
+                Transcription.id != transcription_id
+            ).all()
+
+            for other in other_transcripts:
+                if other.transcript and other.transcript.strip() != data.transcript.strip():
+                    conflicting_points = await detect_conflicts(data.transcript, other.transcript) 
+
+                    for point in conflicting_points:
+                        conflict = Conflict(
+                            new_transcription_id=transcription_id,
+                            existing_transcription_id=other.id,
+                            new_content_snippet=point.get("new_code"),
+                            existing_content_snippet=point.get("existing_code"),
+                            anomaly_type=point.get("anomaly"),
+                        )
+                        db.add(conflict)
+                        hasConflicts = True
         if data.quiz_content is not None:
             db.query(Quiz).filter(Quiz.transcription_id == transcription_id).delete()
             for item in data.quiz_content:
@@ -343,14 +363,13 @@ def finalize_transcription_integration(
             if not folder:
                 raise HTTPException(status_code=404, detail="Target folder not found")
             transcription.folder_id = folder.id
-        transcription.status = data.status
+        if hasConflicts:
+            transcription.status = TranscriptionStatusEnum.ERROR
+        else:
+            transcription.status = TranscriptionStatusEnum.INTEGRATED
 
     db.commit()
     db.refresh(transcription)
-    if quiz:
-        db.refresh(quiz)
-    if sessiondetail:
-        db.refresh(sessiondetail)
     return {
         "message": "Transcription updated successfully and status changed",
         "transcription_id": transcription.id,
@@ -408,6 +427,21 @@ def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session 
 
     db.commit()
     db.refresh(conflict)
+
+    # remaining_conflicts = (
+    #     db.query(Conflict)
+    #     .filter(
+    #         Conflict.new_transcription_id == update_data.new_transcription_id,
+    #         Conflict.status != ConflictStatusEnum.RESOLVED_MERGED
+    #     )
+    #     .count()
+    # )
+    # if remaining_conflicts == 0:
+    #     transcription = db.query(Transcription).get(update_data.new_transcription_id)
+    #     if transcription:
+    #         transcription.status = TranscriptionStatusEnum.INTEGRATED
+    #         db.commit()
+    #         db.refresh(transcription)
 
     all_conflicts = db.query(Conflict).all()
     new_stats = calculate_conflict_stats(all_conflicts)
@@ -496,10 +530,8 @@ def create_transcription(title: str, purpose: str, key_topics: str, source: str)
     db: Session = SessionLocal()
     try:
         key_topics_list = [topic.strip() for topic in key_topics.split(',') if topic.strip()]
-        if title is None:
-            title = source
         transcription = Transcription(
-            title=title,
+            title=title or source,
             purpose=purpose,
             key_topics=key_topics_list,
             transcript=None,
@@ -635,4 +667,20 @@ def create_provision(transcription_id: str, content: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+async def detect_conflicts(new, exisiting):
+    try:
+        summary_a = await summarize_chain.ainvoke({"transcript": new})
+        summary_b = await summarize_chain.ainvoke({"transcript": exisiting})
+        print("summary", summary_b)
+        result = await conflict_chain.ainvoke({
+            "facts_a": "\n".join(summary_a.get("facts")),
+            "facts_b": "\n".join(summary_b.get("facts")),
+        })
+        print("results",result)
+        return [conflict for conflict in result.get("conflicts")]
+
+    except Exception as e:
+        print(f"Conflict detection failed: {e}")
+        return []
 

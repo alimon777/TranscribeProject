@@ -3,10 +3,8 @@ import os
 import re
 import shutil
 import tempfile
-import uuid
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile, HTTPException, File, Form
 from fastapi.responses import JSONResponse
-import threading
 from api.router import create_transcription, update_transcription, get_transcription
 from services.transcription_service import convert_video_to_audio, generate_quiz_logic, process_audio_file, split_and_transcribe, generate_cleantranscription
 
@@ -66,9 +64,6 @@ async def full_transcription_pipeline(
     keywords: str,
     generate_quiz: bool,
 ):
-    print(generate_quiz)
-    if generate_quiz:
-        print("printing", generate_quiz)
     try:
         valid_video_formats = ["video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo"]
         valid_audio_formats = ["audio/wav", "audio/mp3", "audio/mpeg", "audio/ogg"]
@@ -115,9 +110,3 @@ async def full_transcription_pipeline(
 
     except Exception as e:
         print(f"[ERROR] Transcription pipeline failed: {e}")
-
-@transcribe_router.get("/tester/tesing")
-async def testing():
-    transcription = await get_transcription(28)
-    await generate_quiz_logic(transcription["id"], transcription["transcript"], "Requirements Gathering", True)
-    return 0

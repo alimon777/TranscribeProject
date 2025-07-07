@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import uuid
 from fastapi import HTTPException
@@ -8,63 +9,11 @@ import os
 import tempfile
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import concurrent
-from langchain_openai import AzureChatOpenAI
-from langchain_core.prompts import PromptTemplate
-from pydantic import BaseModel, Field
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.output_parsers import JsonOutputParser
-from typing import List
-from api.router import create_provision, create_quiz, update_transcription
+from api.router import create_provision, create_quiz
+from .chains import summarize_chain,summary_chain,chain, conflict_chain, transcriptChain
 
 ffmpeg_path = settings.FFMPEG_PATH
-
-model = AzureChatOpenAI(
-        azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
-        api_key=settings.AZURE_OPENAI_API_KEY,
-        api_version=settings.AZURE_OPENAI_API_VERSION,
-        temperature=0
-    )
-
-class transcriptParser(BaseModel):
-    transcript: str = Field(description="The cleaned, well-formatted version of the chunked transcript.")
-    highlights: List[str] = Field(description="short bullet-point highlights extracted from the transcript chunk.")
-parser = JsonOutputParser(pydantic_object=transcriptParser)
-
-class QuizItem(BaseModel):
-    question: str
-    choices: List[str]
-    correct_answer: str
-
-class ChunkAnalysisOutput(BaseModel):
-    provision_content: str
-    quiz: List[QuizItem]
-
-provision_parser = JsonOutputParser(pydantic_object=ChunkAnalysisOutput)
-
-transcriptPrompt = PromptTemplate(
-    template="""
-        You are an AI that cleans and summarizes transcript chunks. Your tasks are:
-
-        1. Fix grammar and formatting of the transcript chunk.
-        2. Add proper beginning and ending if missing.
-        3. Structure it into well-separated paragraphs.
-        4. Extract key bullet-point highlights from the chunk.
-
-        Use the previous highlights to ensure smooth narrative flow.
-
-        {format_instructions}
-
-        Previous highlights:
-        {previous_highlights}
-
-        Transcript chunk:
-        {chunk}
-        """,
-            input_variables=["previous_highlights", "chunk"],
-            partial_variables={"format_instructions": parser.get_format_instructions()}
-        )
-
-transcriptChain = transcriptPrompt | model | parser
 
 def transcribe_audio_file(audio_file_url):
     global result_phrase_text
@@ -168,19 +117,16 @@ def transcribe_audio_file(audio_file_url):
 def createBlobUrl(filename):
     return f"https://playgroundstorageai.blob.core.windows.net/audio/{filename}{settings.BLOB_URL}"
 
-
-# Function to convert video to audio
 def convert_video_to_audio(video_file):
     try:
         print("Converting video to audio...")
         # Create a temporary file to store the video
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_video:
-            # Save the video file to the temp file
             temp_video.write(video_file.read())
             temp_video.flush()  # Ensure it's written
             temp_video_name = temp_video.name
 
-        file_size = os.path.getsize(temp_video_name)  # Get file size in bytes
+        file_size = os.path.getsize(temp_video_name)
         print(f"File size of video: {file_size} bytes")
 
         # Load the video file from the temporary location
@@ -191,11 +137,10 @@ def convert_video_to_audio(video_file):
             os.remove(temp_video_name)
             raise ValueError("The uploaded video has no audio stream.")
 
-        # Create another temp file for audio
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
             audio_temp_path = temp_audio.name
             video_clip.audio.write_audiofile(
-                audio_temp_path)  # Convert video to audio
+                audio_temp_path)
             video_clip.close()  
 
         # with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as sped_up_audio:
@@ -209,22 +154,18 @@ def convert_video_to_audio(video_file):
         #     sped_up_audio_path
         # ], check=True)
 
-        # Clean up the temporary video file
         os.remove(temp_video_name)
         # os.remove(audio_temp_path)
-        return audio_temp_path  # Return the audio file path for streaming upload
+        return audio_temp_path
     except ValueError as ve:
         print(f"Audio-related error: {ve}")
     except Exception as e:
         print(f"Error converting video to audio: {e}")
         return None
 
-
-# Process audio file (no conversion needed)
 def process_audio_file(audio_file):
     try:
         print("Processing audio file...")
-        # Create a temporary file to store the audio
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio:
             temp_audio.write(audio_file.read())
             temp_audio.flush()
@@ -249,7 +190,7 @@ def process_audio_file(audio_file):
 def split_and_transcribe(audio_file_url):
     try:
         chunk_duration = 300  # 5 minutes
-        output_dir = tempfile.gettempdir()
+        output_dir = tempfile.mkdtemp(prefix="audio_chunks_")
         print("output_dir", output_dir)
         os.makedirs(output_dir, exist_ok=True)
         # Step 1: Split audio into chunks using ffmpeg
@@ -268,12 +209,10 @@ def split_and_transcribe(audio_file_url):
         transcription = []  
         futures = {}
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            # Submit transcription tasks for each chunk with an index to track order
             for index, chunk in enumerate(chunk_paths):
                 uniqueFileName = f"{unique_id}_{index:03d}.wav"
                 upload_url = createBlobUrl(uniqueFileName)
 
-                # Open the processed file and upload it as a stream directly to Azure Blob
                 with open(chunk, "rb") as processed_data:
                     upload_response = requests.put(
                         upload_url,
@@ -284,7 +223,6 @@ def split_and_transcribe(audio_file_url):
                     )
                 futures[executor.submit(transcribe_audio_file, upload_url)] = (upload_url, index)
 
-            # Collect the transcription results and sort by the original index
             for future in concurrent.futures.as_completed(futures):
                 url, index = futures[future]
                 try:
@@ -292,9 +230,8 @@ def split_and_transcribe(audio_file_url):
                     transcription.append((index, result))
                 except Exception as e:
                     print(f"Error in transcription for chunk {index}: {e}")
-                    transcription.append((index, {"message": ""}))  # or skip this index
+                    transcription.append((index, {"message": ""}))
 
-                # Always attempt deletion
                 try:
                     delete_response = requests.delete(url)
                     if delete_response.status_code not in [200, 202, 204]:
@@ -304,70 +241,38 @@ def split_and_transcribe(audio_file_url):
                 except Exception as e:
                     print(f"Error deleting blob {url}: {e}")
 
-        # Sort transcriptions by index to restore the correct order
         transcription.sort(key=lambda x: x[0])
-
-        # Extract the actual transcription results in order
         sorted_transcriptions = ' '.join([
             i[1]["message"] if isinstance(i[1], dict) and "message" in i[1] else str(i[1])
             for i in transcription
         ])
-        print("sorted_trans", sorted_transcriptions)
 
-        print("\nDeleting chunk files...")
-        for chunk_file in chunk_paths:
-            try:
-                os.remove(chunk_file)
-                print(f"Deleted: {chunk_file}")
-            except Exception as e:
-                print(f"Error deleting {chunk_file}: {e}")
+        print("\nDeleting chunk folder...")
+        try:
+            shutil.rmtree(output_dir)
+            print(f"Deleted folder: {output_dir}")
+        except Exception as e:
+            print(f"Error deleting folder {output_dir}: {e}")
         return sorted_transcriptions
     except Exception as e:
          raise HTTPException(status_code=500, detail=str(e))
 
 async def generate_cleantranscription(transcription):
-
-    splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
-    chunks = splitter.split_text(transcription)
-
-    # Step 5.2: Initialize accumulators
-    final_cleaned_transcript = ""
-    all_highlights = []
-    # Step 5.3: Process each chunk
-    for i, chunk in enumerate(chunks):
-        print(f"Processing chunk {i + 1}/{len(chunks)}...")
-
-        result = await transcriptChain.ainvoke({
-            "chunk": chunk,
-            "previous_highlights": "\n".join(all_highlights) if all_highlights else "None"
-        })
-
-        print(result.get("transcript"))
-        final_cleaned_transcript += (result.get("transcript") or "").strip() + "\n\n"
-        all_highlights.extend(result.get("highlights"))
-    allhighlights = "\n".join(all_highlights)
-    print("all hights", allhighlights)
-
     try:
-        # Step 5.4: Generate Final Highlights from All Highlights
-        summary_prompt = PromptTemplate(
-            template="""
-            You are an AI summarizer.
+        splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
+        chunks = splitter.split_text(transcription)
 
-            Refine and condense the following list of highlights from transcript chunks into a clear, organized summary.
-            - Group similar points logically under clear bolded headings.
-            - Use bullet points for individual insights.
-            - Avoid repetition.
-            - Output should be in markdown format.
-
-            Highlights:
-            {chunk_highlights}
-
-            - do not add markdown to the response, and do not start or end with ```.
-            """,
-                input_variables=["chunk_highlights"]
-            )
-        summary_chain = summary_prompt | model
+        final_cleaned_transcript = ""
+        all_highlights = []
+        for i, chunk in enumerate(chunks):
+            print(f"Processing chunk {i + 1}/{len(chunks)}...")
+            result = await transcriptChain.ainvoke({
+                "chunk": chunk,
+                "previous_highlights": "\n".join(all_highlights) if all_highlights else "None"
+            })
+            final_cleaned_transcript += (result.get("transcript") or "").strip() + "\n\n"
+            all_highlights.extend(result.get("highlights"))
+        # print("all highlights", allhighlights)
 
         final_highlight_response = await summary_chain.ainvoke({
             "chunk_highlights": "\n".join(all_highlights)
@@ -383,39 +288,6 @@ async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, g
     splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
     chunks = splitter.split_text(transcription)
 
-    prompt = PromptTemplate(
-        template="""
-        You are an AI assistant analyzing a transcript chunk from a "{session_purpose}" session.
-
-        You are also given previously generated `provision_content` from earlier chunks. Use them to synthesize a refined, high-level final label that represents the overall content and purpose of the full session so far, including this latest chunk.
-
-        Your task:
-        - Generate a single, updated `provision_content` that is concise, specific, and **captures the essence of the entire session** — including this chunk.
-        - Generate 2–3 quiz questions based on this chunk.
-        - Each question must have:
-            - `question`: a concise question string
-            - `choices`: a list of 3–5 answer options
-            - `correct_answer`: the correct answer from the choices
-
-        **Important**:
-        - Do **not** use markdown formatting.
-        - Do **not** include triple backticks (```).
-        - Output must strictly follow the JSON format below.
-
-        {format_instructions}
-
-        Session Purpose: {session_purpose}
-
-        Previous provision labels: {prior_provisions}
-
-        Latest Transcript Chunk:
-        {chunk}
-        """,
-        input_variables=["session_purpose", "prior_provisions", "chunk"],
-        partial_variables={"format_instructions": provision_parser.get_format_instructions()},
-    )
-    chain = prompt | model | provision_parser
-
     all_quizzes = []
     provision_content = ""
     for i, chunk in enumerate(chunks):
@@ -426,7 +298,9 @@ async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, g
         })
         print("processed chunk", i, result.get("quiz"))
         provision_content = result.get("provision_content")
-        all_quizzes.extend(result.get("quiz"))
+        quiz_list = result.get("quiz", [])
+        if quiz_list:
+            all_quizzes.extend(result.get("quiz"))
     
     if generate_quiz:
         create_quiz(transcription_id, all_quizzes)
@@ -435,4 +309,3 @@ async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, g
         create_provision(transcription_id, provision_content)
     
     return provision_content
-
