@@ -134,11 +134,11 @@ export default function ReviewPage() {
 
     const handleQuizAnswerChange = (index, newAnswer) => {
         setEditedQuiz(prev => {
-          const updated = [...prev];
-          updated[index] = { ...updated[index], correct_answer: newAnswer };
-          return updated;
+            const updated = [...prev];
+            updated[index] = { ...updated[index], correct_answer: newAnswer };
+            return updated;
         });
-      };
+    };
 
     // MODIFIED: New handler to update a specific key in the provisionContent state
     const handleProvisionChange = (key, value) => {
@@ -286,7 +286,7 @@ export default function ReviewPage() {
                                 <TabsContent value="transcription" className="mt-4">
                                     <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={20} className="max-h-[100vh] font-mono whitespace-pre-wrap" disabled={isIntegrated} />
                                 </TabsContent>
-                                
+
                                 {/* MODIFIED: Dynamically render TabsContent for each provision item */}
                                 {hasProvisionContent && Object.entries(provisionContent).map(([key, value]) => (
                                     <TabsContent key={key} value={key} className="mt-4">
@@ -299,44 +299,44 @@ export default function ReviewPage() {
                                         />
                                     </TabsContent>
                                 ))}
-                                
+
                                 {!!editedQuiz && (
                                     <TabsContent value="quiz" className="mt-4">
                                         <div className="max-h-[100vh] overflow-y-auto space-y-4 pr-2">
-                                        {editedQuiz.map((item, index) => (
-                                            <div key={index} className="border rounded-lg p-4 bg-muted/30">
-                                            <label className="font-semibold block mb-2">
-                                                Q{index + 1}: {item.question}
-                                            </label>
+                                            {editedQuiz.map((item, index) => (
+                                                <div key={index} className="border rounded-lg p-4 bg-muted/30">
+                                                    <label className="font-semibold block mb-2">
+                                                        Q{index + 1}: {item.question}
+                                                    </label>
 
-                                            <ul className="list-disc pl-6 mb-2">
-                                                {item.choices.map((choice, idx) => (
-                                                <li
-                                                    key={idx}
-                                                    className={
-                                                    choice === item.correct_answer
-                                                        ? "font-semibold text-green-600"
-                                                        : ""
-                                                    }
-                                                >
-                                                    {choice}
-                                                </li>
-                                                ))}
-                                            </ul>
+                                                    <ul className="list-disc pl-6 mb-2">
+                                                        {item.choices.map((choice, idx) => (
+                                                            <li
+                                                                key={idx}
+                                                                className={
+                                                                    choice === item.correct_answer
+                                                                        ? "font-semibold text-green-600"
+                                                                        : ""
+                                                                }
+                                                            >
+                                                                {choice}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
 
-                                            <div className="mt-2">
-                                                <label className="text-sm font-medium text-gray-700">
-                                                Correct Answer
-                                                </label>
-                                                <input
-                                                type="text"
-                                                className="w-full border rounded px-2 py-1 mt-1"
-                                                value={item.correct_answer}
-                                                onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
-                                                />
-                                            </div>
-                                            </div>
-                                        ))}
+                                                    <div className="mt-2">
+                                                        <label className="text-sm font-medium text-gray-700">
+                                                            Correct Answer
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full border rounded px-2 py-1 mt-1"
+                                                            value={item.correct_answer}
+                                                            onChange={(e) => handleQuizAnswerChange(index, e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </TabsContent>
                                 )}
@@ -357,16 +357,16 @@ export default function ReviewPage() {
                                         <strong>Status:</strong> <StatusBadge status={transcriptionData.status} />
                                     </div>
                                 </div></>}
-                                {highlights && (
-                                    <div className={`${
-                                            isIntegrated ? "max-h-[115vh]" : "max-h-[57vh]"
-                                        } overflow-y-auto mt-4 p-2 rounded border bg-muted/20`}>
-                                        <h4 className="font-semibold mb-2 text-primary">Highlights</h4>
+                            {highlights && (
+                                <div className="mt-4 p-2 rounded border bg-muted/20">
+                                    <h4 className="font-semibold mb-2 text-primary">Highlights</h4>
+                                    <div className={`${isIntegrated ? "max-h-[108vh]" : "max-h-[50vh]"} overflow-y-auto`}>
                                         <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlights}</ReactMarkdown>
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlights}</ReactMarkdown>
                                         </div>
                                     </div>
-                                )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                     {!isIntegrated && (

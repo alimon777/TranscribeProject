@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+// src/components/AppBar.js
+
+import React, { useState } from 'react'; // Removed useEffect
 import { Link, useLocation } from 'react-router-dom';
 import {
   UploadCloud,
@@ -22,28 +24,10 @@ import {
 
 export default function AppBar() {
   const location = useLocation();
-  const [currentTheme, setCurrentTheme] = useState('light');
-
-  // Effect to set initial theme and observe changes
-  useEffect(() => {
-    const htmlElement = document.documentElement;
-
-    // Set initial theme state
-    const isInitiallyDark = htmlElement.classList.contains('dark');
-    setCurrentTheme(isInitiallyDark ? 'dark' : 'light');
-
-    // Observe future changes to the class attribute of the <html> element
-    const observer = new MutationObserver(() => {
-      setCurrentTheme(htmlElement.classList.contains('dark') ? 'dark' : 'light');
-    });
-
-    observer.observe(htmlElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    return () => observer.disconnect();
-  }, []);
+  
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'light';
+  });
 
   const navItems = [
     { path: '/upload', label: 'Upload', Icon: UploadCloud },
@@ -52,13 +36,20 @@ export default function AppBar() {
     { path: '/admin', label: 'Admin', Icon: Settings },
   ];
 
+  // MODIFIED: This function now handles everything: updating the DOM, localStorage, and state.
   const handleThemeSwitch = () => {
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     const htmlElement = document.documentElement;
-    if (htmlElement.classList.contains('dark')) {
-      htmlElement.classList.remove('dark');
-    } else {
+
+    localStorage.setItem('theme', newTheme);
+    
+    if (newTheme === 'dark') {
       htmlElement.classList.add('dark');
+    } else {
+      htmlElement.classList.remove('dark');
     }
+
+    setCurrentTheme(newTheme);
   };
 
   const handleLogout = () => {
@@ -98,7 +89,7 @@ export default function AppBar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="font-normal py-4"> {/* Remove default bolding if any from label itself */}
+              <DropdownMenuLabel className="font-normal py-4">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">Admin</p>
                   <p className="text-xs leading-none text-muted-foreground">

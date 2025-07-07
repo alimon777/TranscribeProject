@@ -1,71 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, InfoIcon, Loader2 } from 'lucide-react';
+import { UploadCloud, Loader2 } from 'lucide-react';
 import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
+    Card, CardHeader, CardTitle, CardDescription, CardContent,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
+    Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { usePopup } from '@/components/PopupProvider';
-import { createTranscription, updateTranscription } from '@/services/apiClient';
+import { createTranscription } from '@/services/apiClient';
 
-export default function UploadPage({ setProcessedDataForReview }) {
-    const {alert} = usePopup();
-    const navigate = useNavigate();
-    const [file, setFile] = useState(null);
+const SESSION_PURPOSES = [
+    "General Walkthrough/Overview",
+    "Requirements Gathering",
+    "Technical Deep Dive",
+    "Meeting Minutes",
+    "Training Session",
+    "Product Demo",
+];
+
+// --- CHILD COMPONENT 1: Metadata Form ---
+// This component now manages its own state, so typing here won't re-render other parts of the page.
+const MetadataForm = forwardRef((props, ref) => {
     const [sessionTitle, setSessionTitle] = useState('');
     const [sessionPurpose, setSessionPurpose] = useState('');
     const [primaryTopic, setPrimaryTopic] = useState('');
     const [keywords, setKeywords] = useState('');
-    // MODIFIED: Added state to hold the validation error for keywords
     const [keywordsError, setKeywordsError] = useState('');
-    const [generateQuiz, setGenerateQuiz] = useState(false);
-    const SESSION_PURPOSES = [
-        "General Walkthrough/Overview",
-        "Requirements Gathering",
-        "Technical Deep Dive",
-        "Meeting Minutes",
-        "Training Session",
-        "Product Demo",
-    ];
-    const [isProcessing, setIsProcessing] = useState(false);
 
-    const handleFileChange = (e) => {
-        if (e.target.files?.[0]) setFile(e.target.files[0]);
-    };
-
-    // MODIFIED: Added validation function for keywords
     const validateKeywords = (text) => {
-        if (!text.trim()) return true; // Empty input is valid
-        
-        // This regex checks for a comma-separated list of "ACRONYM(Full Name)" entries.
-        // It allows spaces in the acronym and name, and handles an optional trailing comma.
+        if (!text.trim()) return true;
         const trimmedText = text.trim().replace(/,$/, '').trim();
-        if (!trimmedText) return true; // Input was only spaces or a comma
-
+        if (!trimmedText) return true;
         const pattern = /^[A-Z0-9\s]+\([^)]+\)(?:\s*,\s*[A-Z0-9\s]+\([^)]+\))*$/i;
         return pattern.test(trimmedText);
     };
 
-    // MODIFIED: Added a specific handler for the keywords textarea to perform validation
     const handleKeywordsChange = (e) => {
         const input = e.target.value;
         setKeywords(input);
-
         if (input && !validateKeywords(input)) {
             setKeywordsError("Format must be: SHORTFORM(Full Form), NEXT(Full Form), ...");
         } else {
@@ -73,35 +50,172 @@ export default function UploadPage({ setProcessedDataForReview }) {
         }
     };
 
+    // Expose a function to the parent component via the ref
+    useImperativeHandle(ref, () => ({
+        getValues: () => ({
+            sessionTitle,
+            sessionPurpose,
+            primaryTopic,
+            keywords,
+            keywordsError,
+        }),
+    }));
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">Context & Metadata</CardTitle>
+                <CardDescription className="text-xs">
+                    Provide context to improve transcription accuracy and content organization.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div>
+                    <label htmlFor="sessionTitle" className="text-sm font-medium text-foreground mb-1.5 block">
+                        Session Title <span className="text-xs text-muted-foreground">(Optional but Recommended)</span>
+                    </label>
+                    <Input id="sessionTitle" value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="e.g., Q3 Project Phoenix Planning" />
+                </div>
+                <div>
+                    <label htmlFor="sessionPurpose" className="text-sm font-medium text-foreground mb-1.5 block">Session Purpose</label>
+                    <Select value={sessionPurpose} onValueChange={setSessionPurpose}>
+                        <SelectTrigger className='w-full'><SelectValue placeholder="Select session purpose" /></SelectTrigger>
+                        <SelectContent>{SESSION_PURPOSES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <label htmlFor="primaryTopic" className="text-sm font-medium text-foreground mb-1.5 block">Primary Topic/Domain</label>
+                    <Input id="primaryTopic" value={primaryTopic} onChange={(e) => setPrimaryTopic(e.target.value)} placeholder="e.g., 'CRM System Enhancements', 'Cloud Security'" />
+                </div>
+                <div>
+                    <label htmlFor="keywords" className="text-sm font-medium text-foreground mb-1.5 block">Specific Keywords, Acronyms, or Jargon</label>
+                    <Textarea id="keywords" value={keywords} onChange={handleKeywordsChange} placeholder="e.g., CSP(Cloud Service Provider), DB(Database)" rows={5} />
+                    {keywordsError && <p className="text-xs text-red-600 mt-1.5">{keywordsError}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">This helps correct misinterpretations and ensures domain-specific terms are accurate.</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+});
+
+
+// --- CHILD COMPONENT 2: File Upload ---
+const FileUpload = forwardRef((props, ref) => {
+    const [file, setFile] = useState(null);
+    const handleFileChange = (e) => {
+        if (e.target.files?.[0]) setFile(e.target.files[0]);
+    };
+
+    useImperativeHandle(ref, () => ({
+        getFile: () => file,
+    }));
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">File Upload</CardTitle>
+                <CardDescription className="text-xs">Select your audio or video file for processing</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className={`border-2 border-dashed border-muted text-center rounded-md cursor-pointer hover:border-primary transition-colors bg-muted/20 ${file ? 'p-5' : 'p-8'}`}
+                    onClick={() => document.getElementById('fileInput')?.click()}>
+                    <UploadCloud className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-foreground font-medium">Click to upload or drag and drop</p>
+                    <input type="file" id="fileInput" onChange={handleFileChange} className="hidden" />
+                    {file && <p className="mt-2 text-xs text-green-600">Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</p>}
+                    <p className="text-xs text-muted-foreground mt-1">Maximum file size: 500MB</p>
+                </div>
+                <div className='mt-2 text-xs text-muted-foreground flex justify-between'>
+                    <p>Audio: MP3, WAV, M4A, AAC, FLAC</p>
+                    <p>Video: MP4, MOV, AVI, MKV, WMV</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+});
+
+
+// --- CHILD COMPONENT 3: Output Options ---
+const OutputOptions = forwardRef((props, ref) => {
+    const [generateQuiz, setGenerateQuiz] = useState(false);
+
+    useImperativeHandle(ref, () => ({
+        getValues: () => ({ generateQuiz }),
+    }));
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">Desired Outputs & Actions</CardTitle>
+                <CardDescription className="text-xs">Choose what you'd like the system to generate and do with your content.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="generateQuiz" checked={generateQuiz} onCheckedChange={setGenerateQuiz} />
+                    <label htmlFor="generateQuiz" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Generate Quiz/Mock Assignment
+                    </label>
+                </div>
+            </CardContent>
+        </Card>
+    );
+});
+
+
+// --- PARENT COMPONENT: Upload Page ---
+// This component is now a "controller" or "container". It manages submission logic but not input state.
+export default function UploadPage() {
+    const { alert } = usePopup();
+    const navigate = useNavigate();
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    // Create refs to hold a reference to our child components
+    const metadataRef = useRef();
+    const fileUploadRef = useRef();
+    const outputOptionsRef = useRef();
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // MODIFIED: Added a check to prevent submission if keywords are invalid
-        if (keywordsError) {
+        // Get values from children components imperatively via refs
+        const metadata = metadataRef.current.getValues();
+        const file = fileUploadRef.current.getFile();
+        const options = outputOptionsRef.current.getValues();
+
+        if (metadata.keywordsError) {
             alert('Please correct the keyword format before submitting.');
             return;
         }
 
-        if (!file && !sessionTitle) {
-            alert('Please provide a session title or upload a file.');
+        if (!file) {
+            alert('Please upload a file.');
             return;
         }
+
+        if (!metadata.sessionTitle) {
+            alert('Please provide a session title.');
+            return;
+        }
+
+        setIsProcessing(true);
         try {
             const formData = new FormData();
             formData.append("media", file);
-            formData.append("sessionTitle", sessionTitle);
-            formData.append("sessionPurpose", sessionPurpose);
-            formData.append("primaryTopic", primaryTopic);
+            formData.append("sessionTitle", metadata.sessionTitle);
+            formData.append("sessionPurpose", metadata.sessionPurpose);
+            formData.append("primaryTopic", metadata.primaryTopic);
             formData.append("source", file.name);
-            formData.append("keywords", keywords);
-            formData.append("generateQuiz", generateQuiz.toString());
+            formData.append("keywords", metadata.keywords);
+            formData.append("generateQuiz", options.generateQuiz.toString());
 
-            createTranscription(formData, (data) => {
-                const transcriptionId = data.transcription_id;
-            });
+            createTranscription(formData);
+            alert('Upload successful! Your file is being processed.', 'success');
             navigate('/pending-reviews');
-        } catch {
-            alert('Failed to process content.');
+
+        } catch (err) {
+            console.error("Upload failed:", err)
+            alert('Failed to process content. Please try again.');
+            setIsProcessing(false);
         }
     };
 
@@ -110,180 +224,23 @@ export default function UploadPage({ setProcessedDataForReview }) {
             <div className="mb-6 text-left pl-3 pb-2">
                 <h1 className="text-3xl font-semibold mb-1">Upload & Process Content</h1>
                 <p className="text-md text-muted-foreground">
-                    Upload your audio or video file and provide context for intelligent
-                    processing.
+                    Upload your audio or video file and provide context for intelligent processing.
                 </p>
             </div>
             <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Context & Metadata</CardTitle>
-                                <CardDescription className="text-xs">
-                                    Provide context to improve transcription accuracy and content
-                                    organization.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <label
-                                        htmlFor="sessionTitle"
-                                        className="text-sm font-medium text-foreground mb-1.5 block"
-                                    >
-                                        Session Title{' '}
-                                        <span className="text-xs text-muted-foreground">
-                                            (Optional but Recommended)
-                                        </span>
-                                    </label>
-                                    <Input
-                                        id="sessionTitle"
-                                        value={sessionTitle}
-                                        onChange={(e) => setSessionTitle(e.target.value)}
-                                        placeholder="e.g., Q3 Project Phoenix Planning"
-                                    />
-                                </div>
-                                <div>
-                                    <label
-                                        htmlFor="sessionPurpose"
-                                        className="text-sm font-medium text-foreground mb-1.5 block"
-                                    >
-                                        Session Purpose
-                                    </label>
-                                    <Select value={sessionPurpose} onValueChange={setSessionPurpose}>
-                                        <SelectTrigger className='w-full'>
-                                            <SelectValue placeholder="Select session purpose" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {SESSION_PURPOSES.map((p) => (
-                                                <SelectItem key={p} value={p}>
-                                                    {p}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <label
-                                        htmlFor="primaryTopic"
-                                        className="text-sm font-medium text-foreground mb-1.5 block"
-                                    >
-                                        Primary Topic/Domain
-                                    </label>
-                                    <Input
-                                        id="primaryTopic"
-                                        value={primaryTopic}
-                                        onChange={(e) => setPrimaryTopic(e.target.value)}
-                                        placeholder="e.g., 'CRM System Enhancements', 'Cloud Security'"
-                                    />
-                                </div>
-                                <div>
-                                    <label
-                                        htmlFor="keywords"
-                                        className="text-sm font-medium text-foreground mb-1.5 block"
-                                    >
-                                        Specific Keywords, Acronyms, or Jargon
-                                    </label>
-                                    <Textarea
-                                        id="keywords"
-                                        value={keywords}
-                                        // MODIFIED: Use the new handler with validation
-                                        onChange={handleKeywordsChange}
-                                        // MODIFIED: Updated placeholder to match format
-                                        placeholder="e.g., CSP(Cloud Service Provider), DB(Database)"
-                                        rows={5}
-                                    />
-                                    {/* MODIFIED: Conditionally render the error message */}
-                                    {keywordsError && <p className="text-xs text-red-600 mt-1.5">{keywordsError}</p>}
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        This helps correct misinterpretations and ensures
-                                        domain-specific terms are accurate.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {/* Pass the ref to the child component */}
+                        <MetadataForm ref={metadataRef} />
                     </div>
                     <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">File Upload</CardTitle>
-                                <CardDescription className="text-xs">
-                                    Select your audio or video file for processing
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div
-                                    className="border-2 border-dashed border-muted p-8 text-center rounded-md cursor-pointer hover:border-primary transition-colors bg-muted/20"
-                                    onClick={() =>
-                                        document.getElementById('fileInput')?.click()
-                                    }
-                                >
-                                    <UploadCloud className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                                    <p className="text-sm text-foreground font-medium">
-                                        Click to upload or drag and drop
-                                    </p>
-                                    <input
-                                        type="file"
-                                        id="fileInput"
-                                        onChange={handleFileChange}
-                                        className="hidden"
-                                    />
-                                    {file && (
-                                        <p className="mt-2 text-xs text-green-600">
-                                            Selected: {file.name} (
-                                            {(file.size / 1024 / 1024).toFixed(2)} MB)
-                                        </p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Maximum file size: 500MB
-                                    </p>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-3">
-                                    Supported Audio: MP3, WAV, M4A, AAC, FLAC
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Supported Video: MP4, MOV, AVI, MKV, WMV
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">
-                                    Desired Outputs & Actions
-                                </CardTitle>
-                                <CardDescription className="text-xs">
-                                    Choose what you'd like the system to generate and do with your
-                                    content.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="generateQuiz"
-                                        checked={generateQuiz}
-                                        onCheckedChange={setGenerateQuiz}
-                                    />
-                                    <label
-                                        htmlFor="generateQuiz"
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                    >
-                                        Generate Quiz/Mock Assignment
-                                    </label>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <FileUpload ref={fileUploadRef} />
+                        <OutputOptions ref={outputOptionsRef} />
                     </div>
                 </div>
-                <Button
-                    type="submit"
-                    size="lg"
-                    className="w-full mt-8"
-                    disabled={isProcessing}
-                >
+                <Button type="submit" size="lg" className="w-full mt-8" disabled={isProcessing}>
                     {isProcessing ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
-                        </>
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
                     ) : (
                         'Transcribe & Process'
                     )}

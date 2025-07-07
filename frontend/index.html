@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <!-- <script crossOrigin="anonymous" src="//unpkg.com/react-scan/dist/auto.global.js"></script> -->
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,6 +13,20 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap"
     rel="stylesheet">
   <title>Transcribe</title>
+  <script>
+    (function() {
+      // Check for a saved theme in localStorage and apply it.
+      // Also check for the user's OS preference if no theme is saved.
+      if (
+        localStorage.theme === 'dark' || 
+        (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
 </head>
 
 <body>

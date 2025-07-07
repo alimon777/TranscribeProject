@@ -19,13 +19,13 @@ export default function StatusBadge ({ status }) {
       case TRANSCRIPTION_STATUSES.DRAFT:
         return {
           variant: "outline",
-          className: "text-yellow-600 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30",
+          className: "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30",
           text: "Draft",
         };
       case TRANSCRIPTION_STATUSES.INTEGRATED:
         return {
           variant: "default",
-          className: "text-green-700 border-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30",
+          className: "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/30",
           text: "Integrated",
         };
       case TRANSCRIPTION_STATUSES.PROCESSING:
