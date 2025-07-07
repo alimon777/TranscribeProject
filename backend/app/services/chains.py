@@ -82,54 +82,37 @@ summary_chain = highlights | model
 
 prompt = PromptTemplate(
     template="""
-        You are an AI assistant analyzing a transcript chunk from a "{session_purpose}" session.
-
-        You are also given previously generated `provision_content` from earlier chunks. Use them to synthesize a refined, high-level final label or document section that represents the **overall session so far**, including this latest chunk.
-
-        ### Your Tasks:
-        1. **Update `provision_content`**:
-            - It must be adapted to the session purpose.
-            - Refer to the following formats:
-                - If session purpose is **User Stories**, use:
-                    - User story bullet points
-                    - Include clear Acceptance Criteria for each
-                    - Follow this format:
-                        ```
-                        • As a [role], I want [feature] so that [benefit].
-                        Acceptance Criteria:
-                        • [criterion 1]
-                        • [criterion 2]
-                        ```
-                - If session purpose is **Requirements**, use:
-                    - A structured document:
-                        - Scope
-                        - Overview
-                        - Functional Requirements
-                        - Non-Functional Requirements
-                - If session purpose is something else, use a relevant, structured business-style format.
-            - Expand and refine the existing `provision_content` with the current chunk. Don’t just summarize – **aggregate and elaborate**.
-
-        2. **Generate 2–3 quiz questions** from the current chunk only.
-
-        ### Formatting Rules:
-        - Strictly return JSON with two keys: `provision_content` and `quiz`
-        - Do not use Markdown or triple backticks
-        - Quiz format:
-            - `question`: string
-            - `choices`: list of 3–5 options
-            - `correct_answer`: must match one of the choices
-
+        You are an AI assistant analyzing a transcript chunk from a session titled "{session_purpose}".
+        
+        Based on the session purpose and content, create a comprehensive, well-structured session documentation.
+        Generate appropriate headings and subheadings that best fit the session content and purpose.
+        
+        Requirements:
+        1. Use clear, descriptive headings (ALL CAPS) that are relevant to the session content
+        2. Include detailed bullet points under each section
+        3. Provide comprehensive coverage of the discussion
+        4. Avoid markdown formatting - use plain text with proper spacing
+        5. Make it universally acceptable for any session type
+        6. Include actionable items, decisions, and key insights
+        7. Build upon previous content to create a cohesive document
+        
+        Also generate 2-3 quiz questions based on the content:
+        - question (string)
+        - choices (list of 4 options)
+        - correct_answer (string - must match one of the choices exactly)
+        
+        Use the existing `provision_content` and current `chunk` to create a refined, comprehensive session summary.
+        
         Session Purpose: {session_purpose}
-
-        Previous provision content: {prior_provisions}
-
-        Latest Transcript Chunk:
-        {chunk}
+        Previous Content: {prior_provisions}
+        Current Chunk: {chunk}
 
         {format_instructions}
+        
+        Return JSON with keys: provision_content (string) and quiz (list of question objects).
         """,
         input_variables=["session_purpose", "prior_provisions", "chunk"],
-        partial_variables={"format_instructions": provision_parser.get_format_instructions()},
+        partial_variables={"format_instructions": provision_parser.get_format_instructions()}
     )
 chain = prompt | model | provision_parser
 

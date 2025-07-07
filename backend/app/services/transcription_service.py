@@ -1,3 +1,5 @@
+import datetime
+import re
 import shutil
 import subprocess
 import uuid
@@ -284,28 +286,120 @@ async def generate_cleantranscription(transcription):
         "final_highlights": final_highlight_response.content if final_highlight_response else "",
     }
 
-async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
-    chunks = splitter.split_text(transcription)
+# async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz):
+#     splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
+#     chunks = splitter.split_text(transcription)
 
-    all_quizzes = []
-    provision_content = ""
-    for i, chunk in enumerate(chunks):
-        result = await chain.ainvoke({
-        "session_purpose": sessionPurpose,
-        "prior_provisions": provision_content,
-        "chunk": chunk
-        })
-        print("processed chunk", i, result.get("quiz"))
-        provision_content = result.get("provision_content")
-        quiz_list = result.get("quiz", [])
-        if quiz_list:
-            all_quizzes.extend(result.get("quiz"))
+#     all_quizzes = []
+#     provision_content = ""
+#     for i, chunk in enumerate(chunks):
+#         result = await chain.ainvoke({
+#         "session_purpose": sessionPurpose,
+#         "prior_provisions": provision_content,
+#         "chunk": chunk
+#         })
+#         print("processed chunk", i, result.get("quiz"))
+#         provision_content = result.get("provision_content")
+#         quiz_list = result.get("quiz", [])
+#         if quiz_list:
+#             all_quizzes.extend(result.get("quiz"))
     
-    if generate_quiz:
-        create_quiz(transcription_id, all_quizzes)
-    print("provision_content", provision_content)
-    if sessionPurpose.strip():
-        create_provision(transcription_id, provision_content)
+#     if generate_quiz:
+#         create_quiz(transcription_id, all_quizzes)
+#     print("provision_content", provision_content)
+#     if sessionPurpose.strip():
+#         create_provision(transcription_id, provision_content)
     
-    return provision_content
+#     return provision_content
+
+async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz):
+    try:
+        if not transcription or not transcription.strip():
+            print("Warning: Empty transcription provided")
+            return "No content available for processing"
+ 
+        chunks = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200).split_text(transcription)
+        if not chunks:
+            print("Warning: No chunks generated from transcription")
+            return "Transcription too short to process"
+ 
+        provision_content = ""
+        all_quizzes = []
+        for i, chunk in enumerate(chunks):
+            try:
+                result = await chain.ainvoke({
+                    "session_purpose": sessionPurpose,
+                    "prior_provisions": provision_content,
+                    "chunk": chunk
+                })
+ 
+                print("processed chunk", i, result.get("quiz"))
+ 
+                result_provision = result.get("provision_content")
+                if isinstance(result_provision, dict):
+                    result_provision = '\n\n'.join(f"{k.upper()}\n{v}" for k, v in result_provision.items())
+                elif not isinstance(result_provision, str):
+                    print(f"Warning: Invalid provision_content format in chunk {i}. Skipping.")
+                    continue
+ 
+                provision_content = result_provision
+ 
+                quiz_list = result.get("quiz", [])
+                if isinstance(quiz_list, list):
+                    all_quizzes.extend(quiz_list)
+                else:
+                    print(f"Warning: Invalid quiz format in chunk {i}. Expected list.")
+ 
+            except Exception as e:
+                print(f"Error processing chunk {i}: {str(e)}")
+                continue
+ 
+        if sessionPurpose.strip() and provision_content:
+            create_provision(transcription_id, provision_content)
+ 
+        if generate_quiz and all_quizzes:
+            valid_quizzes = [q for q in all_quizzes if is_valid_quiz(q)]
+            if valid_quizzes:
+                create_quiz(transcription_id, valid_quizzes)
+ 
+        print("provision_content", provision_content)
+        return provision_content
+ 
+    except Exception as e:
+        print(f"Error in generate_quiz_logic: {str(e)}")
+        return "Error in generate_quiz_logic"
+ 
+ 
+def is_valid_quiz(q):
+    return (
+        isinstance(q, dict) and
+        all(k in q for k in ["question", "choices", "correct_answer"]) and
+        isinstance(q["choices"], list) and
+        len(q["choices"]) >= 2 and
+        q["correct_answer"] in q["choices"]
+    )
+ 
+ 
+# def create_fallback_provision(purpose, tid):
+#     return f"""
+#     {purpose.upper()} SESSION DOCUMENTATION
+    
+#     SESSION OVERVIEW
+#     • Session could not be fully processed due to technical issues
+#     • Original transcript should be reviewed manually for complete information
+#     • Session ID: {tid}
+#     • Date: {datetime.now().strftime('%Y-%m-%d')}
+    
+#     IMMEDIATE ACTIONS REQUIRED
+#     • Manual review of original transcript
+#     • Follow-up session scheduling if needed
+#     • Technical issue resolution for future sessions
+    
+#     NEXT STEPS
+#     • Contact session participants for clarification if needed
+#     • Reschedule or continue discussion as appropriate
+#     • Update documentation once manual review is complete
+    
+#     ---
+#     Generated with fallback processing
+#     """.strip()
