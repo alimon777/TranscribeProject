@@ -7,12 +7,12 @@ export const TRANSCRIPTION_STATUSES = {
   DRAFT: "Draft",
   INTEGRATED: "Integrated",
   ARCHIVED: "Archived",
-  PROCESSING: "Processing", 
+  PROCESSING: "Processing",
   AWAITING_APPROVAL: "Awaiting Approval", // Changed key for clarity
   ERROR: "Error",
 };
 
-export default function StatusBadge ({ status }) {
+export default function StatusBadge({ status }) {
   // A helper function could also be used here to map status to styles
   const getStatusProps = () => {
     switch (status) {
@@ -40,6 +40,12 @@ export default function StatusBadge ({ status }) {
           variant: "secondary",
           className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
           text: "Awaiting Approval",
+        };
+      case TRANSCRIPTION_STATUSES.ERROR:
+        return {
+          variant: "secondary",
+          className: "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
+          text: "Conflicts Found",
         };
       default:
         return {
