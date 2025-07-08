@@ -3,26 +3,27 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import (
     JSON, asc, case, create_engine, Column, Integer, String, Text,
-    DateTime, ForeignKey, desc, func, event, or_
+    DateTime, ForeignKey, desc, func, or_
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, backref, joinedload, selectinload
-from sqlalchemy.orm.attributes import get_history
-from sqlalchemy.orm import attributes as orm_attributes
-from sqlalchemy.future import select
-
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, joinedload
 from core.config import settings
-
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-import uuid
+from typing import List, Optional, Dict
 
-from pydantic import BaseModel, Field, model_validator, ConfigDict
-from services.chains import summarize_chain, conflict_chain
+from pydantic import BaseModel, Field
+from services.chains import conflict_chain
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import util
 from typing import List, Dict, Tuple
-import torch
+from langchain_openai import AzureOpenAIEmbeddings
+
+azure_embedding_model = AzureOpenAIEmbeddings(
+        model=settings.AZURE_OPENAI_EMBED_MODEL,
+        api_key=settings.AZURE_OPENAI_EMBED_API_KEY,
+        azure_endpoint=settings.AZURE_OPENAI_EMBED_API_ENDPOINT,
+        api_version=settings.AZURE_OPENAI_EMBED_VERSION,
+    )
 
 # --- Enums (Unchanged) ---
 class SessionPurposeEnum:
@@ -164,7 +165,6 @@ class FullTranscriptionResponse(BaseModel):
     purpose: Optional[str]
     folder_id: Optional[int]
 
-    # Extra fields added in the route
     folder_path: Optional[str]
     quiz_content: List[QuizItem]
     provision_content: Optional[Dict[str, Optional[str]]]
@@ -433,20 +433,20 @@ def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session 
     db.commit()
     db.refresh(conflict)
 
-    # remaining_conflicts = (
-    #     db.query(Conflict)
-    #     .filter(
-    #         Conflict.new_transcription_id == update_data.new_transcription_id,
-    #         Conflict.status != ConflictStatusEnum.RESOLVED_MERGED
-    #     )
-    #     .count()
-    # )
-    # if remaining_conflicts == 0:
-    #     transcription = db.query(Transcription).get(update_data.new_transcription_id)
-    #     if transcription:
-    #         transcription.status = TranscriptionStatusEnum.INTEGRATED
-    #         db.commit()
-    #         db.refresh(transcription)
+    remaining_conflicts = (
+        db.query(Conflict)
+        .filter(
+            Conflict.new_transcription_id == update_data.new_transcription_id,
+            Conflict.status != ConflictStatusEnum.RESOLVED_MERGED
+        )
+        .count()
+    )
+    if remaining_conflicts == 0:
+        transcription = db.query(Transcription).get(update_data.new_transcription_id)
+        if transcription:
+            transcription.status = TranscriptionStatusEnum.INTEGRATED
+            db.commit()
+            db.refresh(transcription)
 
     all_conflicts = db.query(Conflict).all()
     new_stats = calculate_conflict_stats(all_conflicts)
@@ -519,7 +519,7 @@ def get_transcriptions(
         transcription_data["quiz_content"] = [
             {
                 "question": quiz.question,
-                "choices": json.loads(quiz.choices),  # assuming it's stored as JSON string
+                "choices": json.loads(quiz.choices),
                 "correct_answer": quiz.correct_answer
             }
             for quiz in t.quiz
@@ -673,7 +673,6 @@ def create_provision(transcription_id: str, content: str):
     finally:
         db.close()
 
-embedder = SentenceTransformer("paraphrase-MiniLM-L6-v2")
 SIMILARITY_THRESHOLD = 0.75
 
 def get_similar_pairs(embeddings_a, embeddings_b, threshold: float) -> List[Tuple[int, int]]:
@@ -690,8 +689,8 @@ async def detect_conflicts(new, exisiting):
         splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
         chunks_a = splitter.split_text(new)
         chunks_b = splitter.split_text(exisiting)
-        embeddings_a = embedder.encode(chunks_a, convert_to_tensor=True, normalize_embeddings=True)
-        embeddings_b = embedder.encode(chunks_b, convert_to_tensor=True, normalize_embeddings=True)
+        embeddings_a = azure_embedding_model.embed_documents(chunks_a)
+        embeddings_b = azure_embedding_model.embed_documents(chunks_b)
         similar_pairs = get_similar_pairs(embeddings_a, embeddings_b, SIMILARITY_THRESHOLD)
         print("the similar pairs we got", similar_pairs)
         all_conflicts = []

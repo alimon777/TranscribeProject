@@ -2,8 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.transcribe_router import transcribe_router
 from api.router import router
-import logging
-
 
 app = FastAPI()
 

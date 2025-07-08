@@ -1,5 +1,3 @@
-import datetime
-import re
 import shutil
 import subprocess
 import uuid
@@ -13,7 +11,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 import concurrent
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from api.router import create_provision, create_quiz
-from .chains import summarize_chain,summary_chain,chain, conflict_chain, transcriptChain
+from .chains import summary_chain,chain, transcriptChain
 
 ffmpeg_path = settings.FFMPEG_PATH
 
@@ -286,32 +284,6 @@ async def generate_cleantranscription(transcription):
         "final_highlights": final_highlight_response.content if final_highlight_response else "",
     }
 
-# async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz):
-#     splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
-#     chunks = splitter.split_text(transcription)
-
-#     all_quizzes = []
-#     provision_content = ""
-#     for i, chunk in enumerate(chunks):
-#         result = await chain.ainvoke({
-#         "session_purpose": sessionPurpose,
-#         "prior_provisions": provision_content,
-#         "chunk": chunk
-#         })
-#         print("processed chunk", i, result.get("quiz"))
-#         provision_content = result.get("provision_content")
-#         quiz_list = result.get("quiz", [])
-#         if quiz_list:
-#             all_quizzes.extend(result.get("quiz"))
-    
-#     if generate_quiz:
-#         create_quiz(transcription_id, all_quizzes)
-#     print("provision_content", provision_content)
-#     if sessionPurpose.strip():
-#         create_provision(transcription_id, provision_content)
-    
-#     return provision_content
-
 async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz):
     try:
         if not transcription or not transcription.strip():
@@ -378,28 +350,3 @@ def is_valid_quiz(q):
         len(q["choices"]) >= 2 and
         q["correct_answer"] in q["choices"]
     )
- 
- 
-# def create_fallback_provision(purpose, tid):
-#     return f"""
-#     {purpose.upper()} SESSION DOCUMENTATION
-    
-#     SESSION OVERVIEW
-#     • Session could not be fully processed due to technical issues
-#     • Original transcript should be reviewed manually for complete information
-#     • Session ID: {tid}
-#     • Date: {datetime.now().strftime('%Y-%m-%d')}
-    
-#     IMMEDIATE ACTIONS REQUIRED
-#     • Manual review of original transcript
-#     • Follow-up session scheduling if needed
-#     • Technical issue resolution for future sessions
-    
-#     NEXT STEPS
-#     • Contact session participants for clarification if needed
-#     • Reschedule or continue discussion as appropriate
-#     • Update documentation once manual review is complete
-    
-#     ---
-#     Generated with fallback processing
-#     """.strip()

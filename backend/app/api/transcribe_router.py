@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile, HTTPException, File, Form
 from fastapi.responses import JSONResponse
-from api.router import create_transcription, update_transcription, get_transcription
+from api.router import create_transcription, update_transcription
 from services.transcription_service import convert_video_to_audio, generate_quiz_logic, process_audio_file, split_and_transcribe, generate_cleantranscription
 
 
