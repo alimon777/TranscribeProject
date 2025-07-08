@@ -10,6 +10,7 @@ export const TRANSCRIPTION_STATUSES = {
   PROCESSING: "Processing",
   AWAITING_APPROVAL: "Awaiting Approval", // Changed key for clarity
   ERROR: "Error",
+  FINALIZING: "Checking for Conflicts",
 };
 
 export default function StatusBadge({ status }) {
@@ -46,6 +47,12 @@ export default function StatusBadge({ status }) {
           variant: "secondary",
           className: "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
           text: "Conflicts Found",
+        };
+      case TRANSCRIPTION_STATUSES.FINALIZING:
+        return {
+          variant: "secondary",
+          className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+          text: "Awaiting Approval",
         };
       default:
         return {

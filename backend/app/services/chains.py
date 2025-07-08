@@ -4,6 +4,14 @@ from langchain_core.output_parsers import JsonOutputParser
 from core.config import settings
 from pydantic import BaseModel, Field
 from typing import List
+from langchain_openai import AzureOpenAIEmbeddings
+
+azure_embedding_model = AzureOpenAIEmbeddings(
+        model=settings.AZURE_OPENAI_EMBED_MODEL,
+        api_key=settings.AZURE_OPENAI_EMBED_API_KEY,
+        azure_endpoint=settings.AZURE_OPENAI_EMBED_API_ENDPOINT,
+        api_version=settings.AZURE_OPENAI_EMBED_VERSION,
+    )
 
 model = AzureChatOpenAI(
         azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
@@ -147,7 +155,6 @@ conflict_prompt = PromptTemplate(
         Your task:
         - Carefully compare both summaries.
         - Only return conflicts **if there are meaningful contradictions or mismatches**.
-        - If there are **no significant differences**, return an empty list.
 
         When a conflict is found, return:
         - **new_code**: The **exact sentence** from Summary A's corresponding transcript chunk.

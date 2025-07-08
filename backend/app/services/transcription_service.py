@@ -265,14 +265,13 @@ async def generate_cleantranscription(transcription):
         final_cleaned_transcript = ""
         all_highlights = []
         for i, chunk in enumerate(chunks):
-            print(f"Processing chunk {i + 1}/{len(chunks)}...")
+            print(f"Processing chunk {i + 1}/{len(chunks)}... for Clean transcription")
             result = await transcriptChain.ainvoke({
                 "chunk": chunk,
                 "previous_highlights": "\n".join(all_highlights) if all_highlights else "None"
             })
             final_cleaned_transcript += (result.get("transcript") or "").strip() + "\n\n"
             all_highlights.extend(result.get("highlights"))
-        # print("all highlights", allhighlights)
 
         final_highlight_response = await summary_chain.ainvoke({
             "chunk_highlights": "\n".join(all_highlights)
@@ -305,7 +304,7 @@ async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, g
                     "chunk": chunk
                 })
  
-                print("processed chunk", i, result.get("quiz"))
+                print(f"Processing chunk {i + 1}/{len(chunks)}... for provision content")
  
                 result_provision = result.get("provision_content")
                 if isinstance(result_provision, dict):
@@ -333,10 +332,8 @@ async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, g
             valid_quizzes = [q for q in all_quizzes if is_valid_quiz(q)]
             if valid_quizzes:
                 create_quiz(transcription_id, valid_quizzes)
- 
-        print("provision_content", provision_content)
+
         return provision_content
- 
     except Exception as e:
         print(f"Error in generate_quiz_logic: {str(e)}")
         return "Error in generate_quiz_logic"

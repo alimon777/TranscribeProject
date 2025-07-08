@@ -1,36 +1,27 @@
+import asyncio
 import json
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import (
-    JSON, asc, case, create_engine, Column, Integer, String, Text,
+    JSON, and_, asc, case, create_engine, Column, Integer, String, Text,
     DateTime, ForeignKey, desc, func, or_
 )
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship, joinedload
+from services.router_services import detect_conflicts, resolve_transcription
 from core.config import settings
 from datetime import datetime
 from typing import List, Optional, Dict
 
 from pydantic import BaseModel, Field
-from services.chains import conflict_chain
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import util
-from typing import List, Dict, Tuple
-from langchain_openai import AzureOpenAIEmbeddings
-
-azure_embedding_model = AzureOpenAIEmbeddings(
-        model=settings.AZURE_OPENAI_EMBED_MODEL,
-        api_key=settings.AZURE_OPENAI_EMBED_API_KEY,
-        azure_endpoint=settings.AZURE_OPENAI_EMBED_API_ENDPOINT,
-        api_version=settings.AZURE_OPENAI_EMBED_VERSION,
-    )
+from typing import List, Dict
 
 # --- Enums (Unchanged) ---
 class SessionPurposeEnum:
     GENERAL_WALKTHROUGH = "General Walkthrough/Overview"; REQUIREMENTS_GATHERING = "Requirements Gathering"; TECHNICAL_DEEP_DIVE = "Technical Deep Dive"; MEETING_MINUTES = "Meeting Minutes"; TRAINING_SESSION = "Training Session"; PRODUCT_DEMO = "Product Demo"
     ALL_VALUES = [v for k, v in vars().items() if not k.startswith('_') and k != "ALL_VALUES"]
 class TranscriptionStatusEnum:
-    DRAFT = "Draft"; INTEGRATED = "Integrated"; PROCESSING = "Processing"; ERROR = "Error"; AWAITING = "Awaiting Approval"
+    DRAFT = "Draft"; INTEGRATED = "Integrated"; PROCESSING = "Processing"; ERROR = "Error"; AWAITING = "Awaiting Approval"; FINALIZING = "Checking for Conflicts"
     ALL_VALUES = [v for k, v in vars().items() if not k.startswith('_') and k != "ALL_VALUES"]
 class AnomalyTypeEnum:
     CONTRADICTION = "Contradiction"; OVERLAP = "Significant Overlap"; SEMANTIC_DIFFERENCE = "Semantic Difference"; OUTDATED_INFO = "Outdated Information"
@@ -54,7 +45,7 @@ class Folder(Base):
     parent_id = Column(Integer, ForeignKey("folders.id", ondelete="CASCADE"), nullable=True)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     children = relationship("Folder", backref="parent", cascade="all, delete-orphan", remote_side=[id], single_parent=True)
-    transcriptions = relationship("Transcription", back_populates="folder")
+    transcriptions = relationship("Transcription", back_populates="folder", cascade="all, delete-orphan", passive_deletes=True)
 class Quiz(Base):
     __tablename__ = "quiz"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -291,12 +282,13 @@ def get_pending_reviews(db: Session = Depends(get_db)):
     pendings = (
         db.query(Transcription)
         .filter(
-            Transcription.status.in_([TranscriptionStatusEnum.PROCESSING, TranscriptionStatusEnum.AWAITING])
+            Transcription.status.in_([TranscriptionStatusEnum.PROCESSING, TranscriptionStatusEnum.AWAITING, TranscriptionStatusEnum.FINALIZING])
         )
         .order_by(
             case(
                 (Transcription.status == TranscriptionStatusEnum.AWAITING, 0),
-                (Transcription.status == TranscriptionStatusEnum.PROCESSING, 1),
+                (Transcription.status == TranscriptionStatusEnum.FINALIZING, 1),
+                (Transcription.status == TranscriptionStatusEnum.PROCESSING, 2),
             )
         )
         .all()
@@ -307,7 +299,7 @@ def get_pending_reviews(db: Session = Depends(get_db)):
 def get_review_history(db: Session = Depends(get_db)):
     latest_three = (
     db.query(Transcription)
-    .filter(Transcription.status.in_([TranscriptionStatusEnum.INTEGRATED, TranscriptionStatusEnum.DRAFT]))
+    .filter(Transcription.status.in_([TranscriptionStatusEnum.INTEGRATED, TranscriptionStatusEnum.DRAFT, TranscriptionStatusEnum.ERROR]))
     .order_by(desc(Transcription.updated_date))
     .limit(3)
     .all()
@@ -316,16 +308,27 @@ def get_review_history(db: Session = Depends(get_db)):
 
 @router.put("/transcriptions/{transcription_id}/finalize-integration")
 async def finalize_transcription_integration(
+    background_tasks: BackgroundTasks,
     transcription_id: int,
     data: FinalizeIntegrationRequest,
     db: Session = Depends(get_db),
 ):
+    background_tasks.add_task(process_finalize_logic, transcription_id, data, db)
+    return {
+        "message": "Transcription processing started in background",
+        "transcription_id": transcription_id,
+    }
+
+def process_finalize_logic(transcription_id, data: FinalizeIntegrationRequest, db):
     transcription = db.query(Transcription).get(transcription_id)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
     hasConflicts = False
     if data:
+        transcription.status = TranscriptionStatusEnum.FINALIZING
+        db.commit()
+        db.refresh(transcription)
         transcription.transcript = data.transcript
         transcription.highlights = data.highlights
         if data.folder_id:
@@ -336,10 +339,10 @@ async def finalize_transcription_integration(
 
             for other in other_transcripts:
                 if other.transcript and other.transcript.strip() != data.transcript.strip():
-                    print("there are other files")
-                    conflicting_points = await detect_conflicts(data.transcript, other.transcript) 
+                    conflicting_points = asyncio.run(detect_conflicts(data.transcript, other.transcript)) 
 
                     for point in conflicting_points:
+                        print("found conflicts with ", other.title)
                         conflict = Conflict(
                             new_transcription_id=transcription_id,
                             existing_transcription_id=other.id,
@@ -375,11 +378,6 @@ async def finalize_transcription_integration(
 
     db.commit()
     db.refresh(transcription)
-    return {
-        "message": "Transcription updated successfully and status changed",
-        "transcription_id": transcription.id,
-        "folder_id": transcription.folder_id,
-    }
     
 
 @router.delete("/transcriptions/{transcription_id}")
@@ -430,28 +428,45 @@ def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session 
     conflict.resolution_content = update_data.resolution_content
     conflict.updated_date = func.now()
 
-    db.commit()
-    db.refresh(conflict)
+    new_transcription = db.query(Transcription).get(conflict.new_transcription_id)
+    if conflict.existing_content_snippet != update_data.resolution_content:
+        existed_transcription = db.query(Transcription).get(conflict.existing_transcription_id)
+        edited_transcription = resolve_transcription(existed_transcription.transcript, conflict.existing_content_snippet, update_data.resolution_content)
+        existed_transcription.transcript = edited_transcription
+    resolved_transcription = resolve_transcription(new_transcription.transcript, conflict.new_content_snippet, None)
+    new_transcription.transcript = resolved_transcription
 
+    db.commit()
+    db.refresh(new_transcription)
     remaining_conflicts = (
         db.query(Conflict)
         .filter(
-            Conflict.new_transcription_id == update_data.new_transcription_id,
-            Conflict.status != ConflictStatusEnum.RESOLVED_MERGED
+            Conflict.new_transcription_id == conflict.new_transcription_id,
+            Conflict.status == ConflictStatusEnum.PENDING
         )
         .count()
     )
+    print("remaining conflicts", remaining_conflicts)
     if remaining_conflicts == 0:
-        transcription = db.query(Transcription).get(update_data.new_transcription_id)
-        if transcription:
-            transcription.status = TranscriptionStatusEnum.INTEGRATED
-            db.commit()
-            db.refresh(transcription)
+        new_transcription.status = TranscriptionStatusEnum.INTEGRATED
+
+    db.commit()
+    db.refresh(conflict)
 
     all_conflicts = db.query(Conflict).all()
     new_stats = calculate_conflict_stats(all_conflicts)
 
     return {"resolved_conflict": conflict, "newStats": new_stats}
+
+@router.put("/admin/conflicts/{conflict_id}/reject")
+def reject_conflict(conflict_id: int, db: Session = Depends(get_db)):
+    conflict = db.query(Conflict).filter(Conflict.id == conflict_id).first()
+    if not conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+    conflict.status = ConflictStatusEnum.REJECTED
+    db.commit()
+    db.refresh(conflict)
+    return {"message": "Conflict got rejected"}
 
 @router.get("/repository", response_model=List[FullTranscriptionResponse])
 def get_transcriptions(
@@ -467,7 +482,12 @@ def get_transcriptions(
         joinedload(Transcription.quiz),
         joinedload(Transcription.session_detail)
     )
-    query = query.filter(Transcription.status == TranscriptionStatusEnum.INTEGRATED)
+    query = query.filter(
+        and_(
+            Transcription.status == TranscriptionStatusEnum.INTEGRATED,
+            Transcription.folder_id.isnot(None)
+        )
+    )
 
     if folder_id is not None:
         query = query.filter(Transcription.folder_id == folder_id)
@@ -672,42 +692,3 @@ def create_provision(transcription_id: str, content: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
-
-SIMILARITY_THRESHOLD = 0.75
-
-def get_similar_pairs(embeddings_a, embeddings_b, threshold: float) -> List[Tuple[int, int]]:
-    cosine_scores = util.cos_sim(embeddings_a, embeddings_b)
-    similar_pairs = []
-    for i in range(len(embeddings_a)):
-        for j in range(len(embeddings_b)):
-            if cosine_scores[i][j] >= threshold:
-                similar_pairs.append((i, j))
-    return similar_pairs
-
-async def detect_conflicts(new, exisiting):
-    try:
-        splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
-        chunks_a = splitter.split_text(new)
-        chunks_b = splitter.split_text(exisiting)
-        embeddings_a = azure_embedding_model.embed_documents(chunks_a)
-        embeddings_b = azure_embedding_model.embed_documents(chunks_b)
-        similar_pairs = get_similar_pairs(embeddings_a, embeddings_b, SIMILARITY_THRESHOLD)
-        print("the similar pairs we got", similar_pairs)
-        all_conflicts = []
-        for i, j in similar_pairs:
-            try:
-                result = await conflict_chain.ainvoke({
-                    "facts_a": chunks_a[i],
-                    "facts_b": chunks_b[j]
-                })
-                print(result.get("conflicts"))
-                conflicts = result.get("conflicts", [])
-                all_conflicts.extend(conflicts)
-            except Exception as e:
-                print(f"Conflict detection failed for chunk {i}-{j}: {e}")
-                continue
-
-        return all_conflicts
-    except Exception as e:
-        print(f"Conflict detection failed: {e}")
-        return []
