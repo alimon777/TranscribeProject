@@ -106,6 +106,12 @@ async def full_transcription_pipeline(
         if generate_quiz or sessionPurpose.strip():
             await generate_quiz_logic(transcription_id, transcription, sessionPurpose, generate_quiz)
 
+        update_transcription(
+            transcription_id,
+            None,
+            None,
+            None,None
+        )
         print(f"Transcription {transcription_id} pipeline complete.")
 
     except Exception as e:

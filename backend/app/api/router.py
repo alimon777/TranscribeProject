@@ -19,6 +19,10 @@ import uuid
 
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from services.chains import summarize_chain, conflict_chain
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer, util
+from typing import List, Dict, Tuple
+import torch
 
 # --- Enums (Unchanged) ---
 class SessionPurposeEnum:
@@ -332,6 +336,7 @@ async def finalize_transcription_integration(
 
             for other in other_transcripts:
                 if other.transcript and other.transcript.strip() != data.transcript.strip():
+                    print("there are other files")
                     conflicting_points = await detect_conflicts(data.transcript, other.transcript) 
 
                     for point in conflicting_points:
@@ -560,6 +565,8 @@ def update_transcription(transcription_id: int, transcription_text: str, highlig
             raise HTTPException(status_code=404, detail="Transcription not found")
         if transcription_text:
             transcription.transcript = transcription_text
+        else:
+            transcription.status = TranscriptionStatusEnum.AWAITING
         if highlights:
             transcription.highlights = highlights
         if quiz:
@@ -572,8 +579,6 @@ def update_transcription(transcription_id: int, transcription_text: str, highlig
             sessiondetail = db.query(SessionDetail).filter(SessionDetail.transcription_id == transcription_id).first()
             if not sessiondetail:
                 create_provision(transcription_id, provision)
-
-        transcription.status = TranscriptionStatusEnum.AWAITING
         db.commit()
         db.refresh(transcription)
         return {"message": "Transcription updated", "id": transcription_id}
@@ -668,19 +673,42 @@ def create_provision(transcription_id: str, content: str):
     finally:
         db.close()
 
+embedder = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+SIMILARITY_THRESHOLD = 0.75
+
+def get_similar_pairs(embeddings_a, embeddings_b, threshold: float) -> List[Tuple[int, int]]:
+    cosine_scores = util.cos_sim(embeddings_a, embeddings_b)
+    similar_pairs = []
+    for i in range(len(embeddings_a)):
+        for j in range(len(embeddings_b)):
+            if cosine_scores[i][j] >= threshold:
+                similar_pairs.append((i, j))
+    return similar_pairs
+
 async def detect_conflicts(new, exisiting):
     try:
-        summary_a = await summarize_chain.ainvoke({"transcript": new})
-        summary_b = await summarize_chain.ainvoke({"transcript": exisiting})
-        print("summary", summary_b)
-        result = await conflict_chain.ainvoke({
-            "facts_a": "\n".join(summary_a.get("facts")),
-            "facts_b": "\n".join(summary_b.get("facts")),
-        })
-        print("results",result)
-        return [conflict for conflict in result.get("conflicts")]
+        splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
+        chunks_a = splitter.split_text(new)
+        chunks_b = splitter.split_text(exisiting)
+        embeddings_a = embedder.encode(chunks_a, convert_to_tensor=True, normalize_embeddings=True)
+        embeddings_b = embedder.encode(chunks_b, convert_to_tensor=True, normalize_embeddings=True)
+        similar_pairs = get_similar_pairs(embeddings_a, embeddings_b, SIMILARITY_THRESHOLD)
+        print("the similar pairs we got", similar_pairs)
+        all_conflicts = []
+        for i, j in similar_pairs:
+            try:
+                result = await conflict_chain.ainvoke({
+                    "facts_a": chunks_a[i],
+                    "facts_b": chunks_b[j]
+                })
+                print(result.get("conflicts"))
+                conflicts = result.get("conflicts", [])
+                all_conflicts.extend(conflicts)
+            except Exception as e:
+                print(f"Conflict detection failed for chunk {i}-{j}: {e}")
+                continue
 
+        return all_conflicts
     except Exception as e:
         print(f"Conflict detection failed: {e}")
         return []
-

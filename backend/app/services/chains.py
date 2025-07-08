@@ -135,20 +135,27 @@ summarize_chain = summary_prompt | model | summary_parser
 
 conflict_prompt = PromptTemplate(
     template="""
-        You are an AI assistant detecting contradictions or anomalies between two summarized transcripts.
+        You are an AI assistant detecting **true contradictions or anomalies** between two transcript chunks.
+        Below are two sets of summarized facts from separate transcript sections:
 
-        Here are the two sets of summarized facts:
-
-        Summary A (new transcript):
+        Summary A (new transcript chunk):
         {facts_a}
 
-        Summary B (existing transcript):
+        Summary B (existing transcript chunk):
         {facts_b}
 
-        Compare these facts and return a list of conflicts. For each, provide:
-        - new_code: the fact from Summary A
-        - existing_code: the contradicting or mismatched fact from Summary B
-        - anomaly: one of the following values:
+        Your task:
+        - Carefully compare both summaries.
+        - Only return conflicts **if there are meaningful contradictions or mismatches**.
+        - If there are **no significant differences**, return an empty list.
+
+        When a conflict is found, return:
+        - **new_code**: The **exact sentence** from Summary A's corresponding transcript chunk.
+        - **existing_code**: The **exact sentence** from Summary B's corresponding transcript chunk.
+        These must be taken verbatim from the transcript chunks — do not rephrase or summarize them.
+        This allows us to locate them precisely using string matching or regular expressions.
+
+        - **anomaly**: One of the following:
             - CONTRADICTION
             - SIGNIFICANT_OVERLAP
             - SEMANTIC_DIFFERENCE
