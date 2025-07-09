@@ -49,16 +49,9 @@ import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 import { usePopup } from '../components/PopupProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContextData } from '@/lib/ContextData';
+import { SESSION_PURPOSES } from '@/lib/constants';
 
 // Session Purpose Enum Values
-const SESSION_PURPOSE_OPTIONS = [
-  "General Walkthrough/Overview",
-  "Requirements Gathering",
-  "Technical Deep Dive",
-  "Meeting Minutes",
-  "Training Session",
-  "Product Demo",
-];
 
 export default function RepositoryPage() {
   const navigate = useNavigate();
@@ -67,8 +60,6 @@ export default function RepositoryPage() {
   const [transcriptions, setTranscriptions] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedTranscription, setSelectedTranscription] = useState(null);
-  // MODIFIED: isPreviewExpanded state is removed
-  // const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [sortField, setSortField] = useState('integrated_at');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -290,7 +281,7 @@ export default function RepositoryPage() {
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>Filter by Session Purpose</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {SESSION_PURPOSE_OPTIONS.map((purpose) => (
+                {SESSION_PURPOSES.map((purpose) => (
                   <DropdownMenuCheckboxItem key={purpose} checked={activePurposeFilters.has(purpose)} onCheckedChange={(checked) => handlePurposeFilterChange(purpose, Boolean(checked))}>
                     {purpose}
                   </DropdownMenuCheckboxItem>

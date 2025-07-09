@@ -12,7 +12,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { RefreshCw, History, Logs, FileEdit } from 'lucide-react';
-import StatusBadge, { TRANSCRIPTION_STATUSES } from '../components/StatusBadge';
+import StatusBadge from '../components/StatusBadge';
+import { TRANSCRIPTION_STATUSES } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPendingReviewTranscriptions, getReviewHistoryTranscriptions } from '../services/apiClient';
 import CardIllustration from '@/svg_components/CardsIllustration';
@@ -247,7 +248,7 @@ export default function PendingReviewsPage() {
                 const filteredHistory = [];
                 const filteredDrafts = [];
                 combinedData.forEach(item => {
-                    if (item.status === TRANSCRIPTION_STATUSES.INTEGRATED) {
+                    if (item.status === TRANSCRIPTION_STATUSES.INTEGRATED || item.status === TRANSCRIPTION_STATUSES.ERROR) {
                         filteredHistory.push(item);
                     } else if (item.status === TRANSCRIPTION_STATUSES.DRAFT) {
                         filteredDrafts.push(item);

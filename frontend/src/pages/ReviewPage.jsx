@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import IntegrationFolderDialog from '../components/IntegrationFolderDialog';
 import { usePopup } from '../components/PopupProvider';
-import StatusBadge, { TRANSCRIPTION_STATUSES } from '../components/StatusBadge';
+import StatusBadge from '../components/StatusBadge';
+import { TRANSCRIPTION_STATUSES } from '@/lib/constants';
 import {
     finalizeTranscriptionIntegration,
     getTranscriptionDetails,

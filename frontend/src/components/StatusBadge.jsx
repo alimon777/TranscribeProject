@@ -1,17 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-// A map of status constants for consistency and to avoid typos.
-export const TRANSCRIPTION_STATUSES = {
-  DRAFT: "Draft",
-  INTEGRATED: "Integrated",
-  ARCHIVED: "Archived",
-  PROCESSING: "Processing",
-  AWAITING_APPROVAL: "Awaiting Approval", // Changed key for clarity
-  ERROR: "Error",
-  FINALIZING: "Checking for Conflicts",
-};
+import { TRANSCRIPTION_STATUSES } from '@/lib/constants';
 
 export default function StatusBadge({ status }) {
   // A helper function could also be used here to map status to styles
@@ -51,8 +41,8 @@ export default function StatusBadge({ status }) {
       case TRANSCRIPTION_STATUSES.FINALIZING:
         return {
           variant: "secondary",
-          className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-          text: "Awaiting Approval",
+          className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+          text: "Integration InProcess",
         };
       default:
         return {

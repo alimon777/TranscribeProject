@@ -13,18 +13,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { usePopup } from '@/components/PopupProvider';
 import { createTranscription } from '@/services/apiClient';
+import { SESSION_PURPOSES } from '@/lib/constants';
 
-const SESSION_PURPOSES = [
-    "General Walkthrough/Overview",
-    "Requirements Gathering",
-    "Technical Deep Dive",
-    "Meeting Minutes",
-    "Training Session",
-    "Product Demo",
-];
 
 // --- CHILD COMPONENT 1: Metadata Form ---
-// This component now manages its own state, so typing here won't re-render other parts of the page.
 const MetadataForm = forwardRef((props, ref) => {
     const [sessionTitle, setSessionTitle] = useState('');
     const [sessionPurpose, setSessionPurpose] = useState('');
@@ -50,7 +42,17 @@ const MetadataForm = forwardRef((props, ref) => {
         }
     };
 
-    // Expose a function to the parent component via the ref
+    // --- NEW: Custom handler for the Select component ---
+    const handlePurposeChange = (value) => {
+        // If the user selects our special "clear" item, reset the state to an empty string.
+        // Otherwise, set the state to the selected value.
+        if (value === "__clear__") {
+            setSessionPurpose("");
+        } else {
+            setSessionPurpose(value);
+        }
+    };
+
     useImperativeHandle(ref, () => ({
         getValues: () => ({
             sessionTitle,
@@ -78,9 +80,15 @@ const MetadataForm = forwardRef((props, ref) => {
                 </div>
                 <div>
                     <label htmlFor="sessionPurpose" className="text-sm font-medium text-foreground mb-1.5 block">Session Purpose</label>
-                    <Select value={sessionPurpose} onValueChange={setSessionPurpose}>
+                    {/* UPDATED: Use the new handler and a valid value for the clear option */}
+                    <Select value={sessionPurpose} onValueChange={handlePurposeChange}>
                         <SelectTrigger className='w-full'><SelectValue placeholder="Select session purpose" /></SelectTrigger>
-                        <SelectContent>{SESSION_PURPOSES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                        <SelectContent>
+                            <SelectItem value="__clear__" className="text-muted-foreground italic">
+                                Clear selection
+                            </SelectItem>
+                            {SESSION_PURPOSES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        </SelectContent>
                     </Select>
                 </div>
                 <div>
@@ -99,7 +107,7 @@ const MetadataForm = forwardRef((props, ref) => {
 });
 
 
-// --- CHILD COMPONENT 2: File Upload ---
+// --- CHILD COMPONENT 2: File Upload (No changes needed) ---
 const FileUpload = forwardRef((props, ref) => {
     const [file, setFile] = useState(null);
     const handleFileChange = (e) => {
@@ -135,7 +143,7 @@ const FileUpload = forwardRef((props, ref) => {
 });
 
 
-// --- CHILD COMPONENT 3: Output Options ---
+// --- CHILD COMPONENT 3: Output Options (No changes needed) ---
 const OutputOptions = forwardRef((props, ref) => {
     const [generateQuiz, setGenerateQuiz] = useState(false);
 
@@ -162,8 +170,7 @@ const OutputOptions = forwardRef((props, ref) => {
 });
 
 
-// --- PARENT COMPONENT: Upload Page ---
-// This component is now a "controller" or "container". It manages submission logic but not input state.
+// --- PARENT COMPONENT: Upload Page (No changes needed) ---
 export default function UploadPage() {
     const { alert } = usePopup();
     const navigate = useNavigate();
