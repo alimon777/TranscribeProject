@@ -329,12 +329,12 @@ def process_finalize_logic(transcription_id, data: FinalizeIntegrationRequest, d
 
     hasConflicts = False
     if data:
-        transcription.status = TranscriptionStatusEnum.FINALIZING
-        db.commit()
-        db.refresh(transcription)
         transcription.transcript = data.transcript
         transcription.highlights = data.highlights
         if data.folder_id:
+            transcription.status = TranscriptionStatusEnum.FINALIZING
+            db.commit()
+            db.refresh(transcription)
             other_transcripts = db.query(Transcription).filter(
                 Transcription.folder_id == data.folder_id,
                 Transcription.id != transcription_id
@@ -374,12 +374,12 @@ def process_finalize_logic(transcription_id, data: FinalizeIntegrationRequest, d
             if not folder:
                 raise HTTPException(status_code=404, detail="Target folder not found")
             transcription.folder_id = folder.id
-        if hasConflicts:
-            transcription.status = TranscriptionStatusEnum.ERROR
-        elif data.status == TranscriptionStatusEnum.DRAFT:
-            transcription.status = TranscriptionStatusEnum.DRAFT
-        else:
-            transcription.status = TranscriptionStatusEnum.INTEGRATED
+    if hasConflicts:
+        transcription.status = TranscriptionStatusEnum.ERROR
+    elif data.status == TranscriptionStatusEnum.DRAFT:
+        transcription.status = TranscriptionStatusEnum.DRAFT
+    else:
+        transcription.status = TranscriptionStatusEnum.INTEGRATED
 
     db.commit()
     db.refresh(transcription)
@@ -452,7 +452,11 @@ def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session 
         .count()
     )
     print("remaining conflicts", remaining_conflicts)
+    response = {
+        "resolved_conflict": conflict,
+    }
     if remaining_conflicts == 0:
+        response["message"] = new_transcription.title
         new_transcription.status = TranscriptionStatusEnum.INTEGRATED
 
     db.commit()
@@ -460,9 +464,8 @@ def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session 
 
     all_conflicts = db.query(Conflict).all()
     new_stats = calculate_conflict_stats(all_conflicts)
-    if remaining_conflicts == 0:
-        return {"resolved_conflict": conflict, "newStats": new_stats, "message": new_transcription.title}
-    return {"resolved_conflict": conflict, "newStats": new_stats}
+    response["newStats"] = new_stats
+    return response
 
 @router.put("/admin/conflicts/{conflict_id}/reject")
 def reject_conflict(conflict_id: int, db: Session = Depends(get_db)):
@@ -472,7 +475,27 @@ def reject_conflict(conflict_id: int, db: Session = Depends(get_db)):
     conflict.status = ConflictStatusEnum.REJECTED
     db.commit()
     db.refresh(conflict)
-    return {"message": "Conflict got rejected"}
+    all_conflicts = db.query(Conflict).all()
+    remaining_conflicts = (
+        db.query(Conflict)
+        .filter(
+            Conflict.new_transcription_id == conflict.new_transcription_id,
+            Conflict.status == ConflictStatusEnum.PENDING
+        )
+        .count()
+    )
+    new_stats = calculate_conflict_stats(all_conflicts)
+    response = {
+        "rejected_conflict": conflict,
+        "updated_stats": new_stats
+    }
+    if remaining_conflicts == 0:
+        new_transcription = db.query(Transcription).get(conflict.new_transcription_id)
+        new_transcription.status = TranscriptionStatusEnum.INTEGRATED
+        db.commit()
+        db.refresh(new_transcription)
+        response["message"] = new_transcription.title
+    return response
 
 @router.get("/repository", response_model=List[FullTranscriptionResponse])
 def get_transcriptions(

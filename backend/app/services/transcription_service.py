@@ -259,7 +259,7 @@ def split_and_transcribe(audio_file_url):
 
 async def generate_cleantranscription(transcription):
     try:
-        splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=200)
         chunks = splitter.split_text(transcription)
 
         final_cleaned_transcript = ""
@@ -289,7 +289,7 @@ async def generate_quiz_logic(transcription_id, transcription, sessionPurpose, g
             print("Warning: Empty transcription provided")
             return "No content available for processing"
  
-        chunks = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200).split_text(transcription)
+        chunks = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=200).split_text(transcription)
         if not chunks:
             print("Warning: No chunks generated from transcription")
             return "Transcription too short to process"

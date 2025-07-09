@@ -7,12 +7,9 @@ from .chains import azure_embedding_model, conflict_chain
 SIMILARITY_THRESHOLD = 0.75
 
 def get_similar_pairs(embeddings_a, embeddings_b, threshold: float) -> List[Tuple[int, int]]:
-    cosine_scores = util.cos_sim(embeddings_a, embeddings_b)
-    similar_pairs = []
-    for i in range(len(embeddings_a)):
-        for j in range(len(embeddings_b)):
-            if cosine_scores[i][j] >= threshold:
-                similar_pairs.append((i, j))
+    cosine_scores = util.cos_sim(embeddings_a, embeddings_b) 
+    indices = (cosine_scores >= threshold).nonzero(as_tuple=False)
+    similar_pairs = [(int(i), int(j)) for i, j in indices]
     return similar_pairs
 
 async def detect_conflicts(new, exisiting):

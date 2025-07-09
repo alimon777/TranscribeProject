@@ -28,6 +28,7 @@ async def upload_metadata(
         if not media:
             raise HTTPException(status_code=400, detail="No media file provided")
 
+        generateQuiz = generateQuiz.lower() == "true"
         transcription_message = create_transcription(sessionTitle, sessionPurpose, primaryTopic, source)
         transcription_id = transcription_message["id"]
 

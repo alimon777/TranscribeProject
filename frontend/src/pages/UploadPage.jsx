@@ -159,7 +159,7 @@ const OutputOptions = forwardRef((props, ref) => {
             </CardHeader>
             <CardContent className="space-y-3">
                 <div className="flex items-center space-x-2">
-                    <Checkbox id="generateQuiz" checked={generateQuiz} onCheckedChange={setGenerateQuiz} />
+                    <Checkbox id="generateQuiz" checked={generateQuiz} onCheckedChange={(checked) => setGenerateQuiz(checked === true)} />
                     <label htmlFor="generateQuiz" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                         Generate Quiz/Mock Assignment
                     </label>
@@ -213,7 +213,7 @@ export default function UploadPage() {
             formData.append("primaryTopic", metadata.primaryTopic);
             formData.append("source", file.name);
             formData.append("keywords", metadata.keywords);
-            formData.append("generateQuiz", options.generateQuiz.toString());
+            formData.append("generateQuiz", options.generateQuiz ? "true" : "false");
 
             createTranscription(formData);
             alert('Upload successful! Your file is being processed.', 'success');

@@ -216,9 +216,13 @@ export default function AdminDashboardPage() {
       .then((response) => {
         const rejectedConflictData = response.rejected_conflict;
         const newStats = response.updated_stats;
+        const message = response?.message;
         setConflicts((prev) => prev.filter((c) => c.id !== rejectedConflictData.id));
         setApiStats(newStats || apiStats);
-        alert('Conflict has been rejected.');
+        if (message)
+          alert(`Conflict rejected and ${message} integrated successfully.`);
+        else
+          alert('Conflict has been rejected.');
         setIsModalOpen(false);
         setDetail(null);
       })

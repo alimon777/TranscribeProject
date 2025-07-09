@@ -40,19 +40,20 @@ class ConflictItem(BaseModel):
     anomaly: str
 class ConflictOutput(BaseModel):
     conflicts: List[ConflictItem]
-class SummaryOutput(BaseModel):
-    facts: List[str]
-summary_parser = JsonOutputParser(pydantic_object=SummaryOutput)
 conflict_parser = JsonOutputParser(pydantic_object=ConflictOutput)
 
 transcriptPrompt = PromptTemplate(
     template="""
-        You are an AI that cleans and summarizes transcript chunks. Your tasks are:
+        You are an AI assistant that **cleans and lightly enhances transcript chunks** without altering their meaning.
 
-        1. Fix grammar and formatting of the transcript chunk.
-        2. Add proper beginning and ending if missing.
-        3. Structure it into well-separated paragraphs.
-        4. Extract key bullet-point highlights from the chunk.
+        Your responsibilities:
+        1. Fix grammar, punctuation, and any accent-related issues.
+        2. Ensure a proper beginning and ending (e.g., don't start mid-sentence).
+        3. Structure the text into well-separated, readable paragraphs.
+        4. Do NOT summarize, rephrase, or remove any meaningful content.
+        5. Keep the wording and intent of the original chunk as close as possible.
+        6. Return the improved transcript chunk in full.
+        7. Along with this, Extract key bullet-point highlights from the chunk.
 
         Use the previous highlights to ensure smooth narrative flow.
 
@@ -124,26 +125,10 @@ prompt = PromptTemplate(
     )
 chain = prompt | model | provision_parser
 
-
-summary_prompt = PromptTemplate(
-    template="""
-        You are an AI assistant tasked with summarizing a meeting transcript.
-
-        Summarize it into clear, factual bullet points. Each bullet must represent one discrete idea, statement, decision, or observation that was made in the transcript. Avoid opinions or filler language.
-
-        Transcript:
-        \"\"\"{transcript}\"\"\"
-
-        {format_instructions}
-        """,
-        input_variables=["transcript"],
-        partial_variables={"format_instructions": summary_parser.get_format_instructions()}
-    )
-summarize_chain = summary_prompt | model | summary_parser
-
 conflict_prompt = PromptTemplate(
     template="""
-        You are an AI assistant detecting **true contradictions or anomalies** between two transcript chunks.
+        You are an AI assistant tasked with detecting **true contradictions or factual anomalies** between two transcript chunks.
+
         Below are two sets of summarized facts from separate transcript sections:
 
         Summary A (new transcript chunk):
@@ -153,20 +138,23 @@ conflict_prompt = PromptTemplate(
         {facts_b}
 
         Your task:
-        - Carefully compare both summaries.
-        - Only return conflicts **if there are meaningful contradictions or mismatches**.
+        - Compare both summaries carefully.
+        - Only return results if there are **meaningful contradictions or factual mismatches**.
+        - Ignore statements that are **paraphrased**, **semantically similar**, or express the **same idea** in different words — these are NOT conflicts.
 
-        When a conflict is found, return:
-        - **new_code**: The **exact sentence** from Summary A's corresponding transcript chunk.
-        - **existing_code**: The **exact sentence** from Summary B's corresponding transcript chunk.
-        These must be taken verbatim from the transcript chunks — do not rephrase or summarize them.
-        This allows us to locate them precisely using string matching or regular expressions.
+        Return a result ONLY if one or more of the following anomalies are clearly present:
+        - **CONTRADICTION**: The two summaries clearly assert opposing facts.
+        - **OUTDATED_INFO**: One summary reflects updated or corrected information that invalidates the other.
+        - **SEMANTIC_DIFFERENCE**: Subtle but important difference in meaning, intent, or interpretation — only if it could change downstream understanding or decisions.
 
-        - **anomaly**: One of the following:
-            - CONTRADICTION
-            - SIGNIFICANT_OVERLAP
-            - SEMANTIC_DIFFERENCE
-            - OUTDATED_INFO
+        DO NOT return results for:
+        - Rephrased or overlapping content
+        - Slight variations in wording that preserve the same meaning
+
+        If a conflict is found, return:
+        - **new_code**: The exact sentence from Summary A's corresponding transcript chunk (verbatim).
+        - **existing_code**: The exact sentence from Summary B's corresponding transcript chunk (verbatim).
+        - **anomaly**: One of: CONTRADICTION, OUTDATED_INFO, SEMANTIC_DIFFERENCE
 
         {format_instructions}
         """,

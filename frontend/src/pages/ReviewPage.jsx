@@ -220,6 +220,7 @@ export default function ReviewPage() {
 
     // MODIFIED: Removed dynamic grid class calculation as it's no longer needed and fragile.
     const hasProvisionContent = provisionContent && Object.keys(provisionContent).length > 0;
+    const hasQuizContent = editedQuiz && Object.keys(editedQuiz).length > 0
 
     return (
         <div className="p-4 md:p-6 w-full">
@@ -282,7 +283,7 @@ export default function ReviewPage() {
                                     {hasProvisionContent && Object.keys(provisionContent).map(key => (
                                         <TabsTrigger key={key} value={key}>{key}</TabsTrigger>
                                     ))}
-                                    {!!editedQuiz && <TabsTrigger value="quiz">Quiz/Assignment</TabsTrigger>}
+                                    {hasQuizContent && <TabsTrigger value="quiz">Quiz/Assignment</TabsTrigger>}
                                 </TabsList>
                                 <TabsContent value="transcription" className="mt-4">
                                     <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={20} className="max-h-[100vh] font-mono whitespace-pre-wrap" disabled={isIntegrated} />
@@ -301,7 +302,7 @@ export default function ReviewPage() {
                                     </TabsContent>
                                 ))}
 
-                                {!!editedQuiz && (
+                                {hasQuizContent && (
                                     <TabsContent value="quiz" className="mt-4">
                                         <div className="max-h-[100vh] overflow-y-auto space-y-4 pr-2">
                                             {editedQuiz.map((item, index) => (
