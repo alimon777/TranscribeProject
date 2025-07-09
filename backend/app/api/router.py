@@ -226,9 +226,13 @@ def build_folder_path(folder: Folder, db: Session) -> str:
 def calculate_conflict_stats(conflicts: list[Conflict]):
     status_counts = {"pending": 0, "resolved": 0, "rejected": 0}
     for conflict in conflicts:
-        key = conflict.status.lower()
-        if key in status_counts:
-            status_counts[key] += 1
+        key = conflict.status
+        if key=="Pending Review":
+            status_counts["pending"] += 1
+        elif key=="Resolved (Merged)":
+            status_counts["resolved"] += 1
+        elif key=="Rejected":
+            status_counts["rejected"] += 1
     status_counts["total"] = len(conflicts)
     return status_counts
 
@@ -301,7 +305,6 @@ def get_review_history(db: Session = Depends(get_db)):
     db.query(Transcription)
     .filter(Transcription.status.in_([TranscriptionStatusEnum.INTEGRATED, TranscriptionStatusEnum.DRAFT, TranscriptionStatusEnum.ERROR]))
     .order_by(desc(Transcription.updated_date))
-    .limit(3)
     .all()
     )
     return latest_three
@@ -315,7 +318,7 @@ async def finalize_transcription_integration(
 ):
     background_tasks.add_task(process_finalize_logic, transcription_id, data, db)
     return {
-        "message": "Transcription processing started in background",
+        "message": "Integration finalized successfully!",
         "transcription_id": transcription_id,
     }
 
@@ -373,6 +376,8 @@ def process_finalize_logic(transcription_id, data: FinalizeIntegrationRequest, d
             transcription.folder_id = folder.id
         if hasConflicts:
             transcription.status = TranscriptionStatusEnum.ERROR
+        elif data.status == TranscriptionStatusEnum.DRAFT:
+            transcription.status = TranscriptionStatusEnum.DRAFT
         else:
             transcription.status = TranscriptionStatusEnum.INTEGRATED
 
@@ -413,8 +418,8 @@ def get_conflict_detail(conflict_id: int, db: Session = Depends(get_db)):
         return ""
     
     resp_dict = conflict.__dict__.copy()
-    resp_dict["path_left"] = get_path(existing_trans)
-    resp_dict["path_right"] = get_path(new_trans)
+    resp_dict["path_left"] = get_path(existing_trans) + f"/{existing_trans.title}"
+    resp_dict["path_right"] = get_path(new_trans) + f"/{new_trans.title}"
 
     return ConflictResponse.model_validate(resp_dict)
 
@@ -455,7 +460,8 @@ def resolve_conflict(conflict_id: int, update_data: ConflictUpdate, db: Session 
 
     all_conflicts = db.query(Conflict).all()
     new_stats = calculate_conflict_stats(all_conflicts)
-
+    if remaining_conflicts == 0:
+        return {"resolved_conflict": conflict, "newStats": new_stats, "message": new_transcription.title}
     return {"resolved_conflict": conflict, "newStats": new_stats}
 
 @router.put("/admin/conflicts/{conflict_id}/reject")
