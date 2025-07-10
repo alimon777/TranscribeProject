@@ -247,7 +247,7 @@ export const TreeView = ({
   const triggerAdd = parentId => {
     cancelAll();
     setAddingId(parentId);
-    setNewNameVal('New Folder');
+    setNewNameVal(''); // Start with an empty name for better placeholder visibility
     if (parentId !== null) {
       setExpandedIds(s => new Set(s).add(parentId));
     }
@@ -255,7 +255,8 @@ export const TreeView = ({
 
   const commitAdd = async () => {
     const name = newNameVal.trim();
-    const pid = addingId;
+    // Check if adding subfolder or root folder
+    const pid = addingId === null && allowRootFolderAdd ? null : addingId;
     cancelAll();
     if (!name) return;
     const propId = `${pid || 'root'}-${Date.now()}`;
@@ -297,36 +298,69 @@ export const TreeView = ({
     expandedIds, selectedId,
     renamingId, renamingVal,
     addingId, newNameVal,
-    enableEditing, toggle, cancelAll,
-    onNodeSelect, onNodeEditCommit, onNodeDeleteCommit, onNodeAddCommit
+    enableEditing, toggle, cancelAll, commitAdd,
+    onNodeSelect
   ]);
+
+  // Handler specifically for the root add input
+  const handleRootAddCommit = () => {
+    // Ensure we are not in a subfolder-add state
+    if (addingId === null) {
+      commitAdd();
+    }
+  }
 
   return (
     <div className={className}>
       {allowRootFolderAdd && enableEditing && (
-        <div className="flex items-center gap-1 py-1 pr-1 rounded mb-1" style={{ paddingLeft: '0.5rem' }}>
-          <FolderPlus className="h-3 w-3 text-muted-foreground mr-2" />
+        <div className="flex items-center gap-2 py-1 pr-1 rounded mb-2" style={{ paddingLeft: '0.5rem' }}>
           <Input
             value={newNameVal}
             placeholder="New root folder…"
             className="text-sm py-0 px-1 flex-grow"
             onChange={e => onNewNameChange(e.target.value)}
+            onFocus={() => setAddingId(null)} // Ensure we're adding a root folder
             onKeyDown={e => {
-              if (e.key === 'Enter') commitAdd();
-              if (e.key === 'Escape') cancelAll();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleRootAddCommit();
+              }
+              if (e.key === 'Escape') {
+                cancelAll();
+              }
             }}
-            onBlur={() => commitAdd()}
+            onBlur={() => {
+              // Only commit on blur if there is text, to avoid accidental adds
+              if (newNameVal.trim()) {
+                handleRootAddCommit();
+              } else {
+                // If blurred and empty, just cancel
+                cancelAll();
+              }
+            }}
           />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 flex-shrink-0"
+            onClick={(e) => {
+              e.preventDefault();
+              handleRootAddCommit();
+            }}
+            disabled={!newNameVal.trim()}
+            aria-label="Add new root folder"
+          >
+            <FolderPlus className="h-4 w-4" />
+          </Button>
         </div>
       )}
-
       {data && data.length > 0 ? (
         <ul role="tree">
           {renderTree(data, 0)}
         </ul>
       ) : (
-        <div className='flex-row justify-items-center mt-22'>
-          <NoFile className='h-20 w-20 mb-5' />
+        <div className='flex flex-col items-center justify-center text-center mt-20'>
+          <NoFile className='h-20 w-20 mb-4 text-muted' />
           <div className="text-muted-foreground text-sm">
             No folders available.
           </div>

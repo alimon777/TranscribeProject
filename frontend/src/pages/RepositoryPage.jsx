@@ -51,8 +51,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ContextData } from '@/lib/ContextData';
 import { SESSION_PURPOSES } from '@/lib/constants';
 
-// Session Purpose Enum Values
-
 export default function RepositoryPage() {
   const navigate = useNavigate();
   const { treeData, updateFolderTree } = useContext(ContextData);
@@ -73,7 +71,6 @@ export default function RepositoryPage() {
     handleDelete: handleDeleteFolder,
   } = useFolderOperations(selectedFolder, setSelectedFolder);
 
-  // ... useEffect for fetching tree remains the same ...
   useEffect(() => {
     const fetchInitialTree = async () => {
       try {
@@ -86,9 +83,8 @@ export default function RepositoryPage() {
       }
     };
     fetchInitialTree();
-  }, []); 
+  }, []);
 
-  // ... fetchRepositoryContent and other handlers remain the same ...
   const fetchRepositoryContent = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -189,8 +185,9 @@ export default function RepositoryPage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+  
+  const isPreviewVisible = !!selectedTranscription;
 
-  // ... Skeleton and main component structure remains the same ...
   if (isLoading && transcriptions.length === 0 && treeData.length === 0) {
     return (
       <div className="p-4 md:p-6 w-full">
@@ -218,7 +215,19 @@ export default function RepositoryPage() {
 
       <div className="flex flex-col md:flex-row gap-6">
         <aside className="w-full md:w-64 border rounded p-2 flex-shrink-0">
-          <h2 className="font-medium py-2 ml-3 mb-2">Directory</h2>
+          <div className="flex justify-between items-center py-2 px-3 mb-2">
+            <h2 className="font-medium">Directory</h2>
+            <button
+              className="text-xs font-medium text-primary hover:underline focus:outline-none"
+              onClick={() => {
+                setSelectedFolder('all');
+                setSelectedTranscription(null);
+              }}
+              aria-label="Show all transcriptions from all folders"
+            >
+              Show All
+            </button>
+          </div>
           {treeData.length === 0 && isLoading ? (
             <Skeleton className="h-40 w-full p-2" />
           ) : (
@@ -298,28 +307,28 @@ export default function RepositoryPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
-          <div className="flex flex-col md:flex-row gap-6">
+          
+          <div className={`flex flex-col md:flex-row min-w-0 ${isPreviewVisible ? 'gap-6' : ''}`}>
             <div className="w-full md:flex-1 md:min-w-0 transition-all duration-300">
-              <Card>
+              <Card className={isPreviewVisible ? "h-full flex flex-col" : ""}>
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl">
                     {selectedFolder === 'all' ? 'All Integrated Transcriptions' : `In "${getFolderName(selectedFolder)}"`}
                     {activePurposeFilters.size > 0 && <Badge variant="secondary" className="ml-2 font-normal text-xs align-middle">{activePurposeFilters.size} Purpose Filter{activePurposeFilters.size > 1 ? 's' : ''} Active</Badge>}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={isPreviewVisible ? "flex-1 min-h-0" : ""}>
                   {isLoading && transcriptions.length === 0 ? (
                     <div className="max-h-[345px] overflow-auto p-4">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full mb-2" />)}
                     </div>
                   ) : transcriptions.length === 0 ? (
-                    <div className='flex-row justify-items-center'>
+                    <div className='flex-row justify-items-center h-92'>
                       <CardIllustration className='h-50 w-50'/>
                       <div className="text-muted-foreground -mt-12 text-sm">No integrated transcriptions found matching your criteria.</div>
                     </div>
                   ) : (
-                    <div className="h-[calc(100vh-345px)] overflow-auto">
+                    <div className={`overflow-auto ${isPreviewVisible ? "h-full" : "h-92"}`}>
                       <Table>
                         <TableHeader className="sticky top-0 bg-card z-10">
                           <TableRow>
@@ -332,7 +341,14 @@ export default function RepositoryPage() {
                         </TableHeader>
                         <TableBody>
                           {transcriptions.map((t) => (
-                            <TableRow key={t.id} className={`cursor-pointer hover:bg-muted ${selectedTranscription?.id === t.id ? 'bg-muted' : ''}`} onClick={() => setSelectedTranscription(t)} aria-selected={selectedTranscription?.id === t.id}>
+                            <TableRow
+                              key={t.id}
+                              className={`cursor-pointer hover:bg-muted ${selectedTranscription?.id === t.id ? 'bg-muted' : ''}`}
+                              onClick={() => setSelectedTranscription(selectedTranscription?.id === t.id ? null : t)}
+                              onDoubleClick={() => navigate(`/transcription/${t.id}`)}
+                              title="Single-click to toggle preview, double-click to open full page"
+                              aria-selected={selectedTranscription?.id === t.id}
+                            >
                               <TableCell>
                                 <div className="font-medium truncate max-w-[150px] sm:max-w-xs" title={t.title}>{t.title}</div>
                                 <div className="text-xs text-muted-foreground truncate max-w-[150px] sm:max-w-xs" title={t.source_file_name}>{t.source_file_name || 'N/A'}</div>
@@ -361,8 +377,14 @@ export default function RepositoryPage() {
               </Card>
             </div>
 
-            {selectedTranscription && (
-              <div className="w-full md:w-1/3 flex-shrink-0 mr-6">
+            <div
+              className={`
+                flex-shrink-0 transition-all duration-300 ease-in-out
+                ${isPreviewVisible ? 'w-full md:w-80' : 'w-0'}
+                overflow-hidden
+              `}
+            >
+              {isPreviewVisible && (
                 <TranscriptionPreview
                   transcription={selectedTranscription}
                   folderName={getFolderName(selectedTranscription.folder_id)}
@@ -373,13 +395,11 @@ export default function RepositoryPage() {
                   onDownload={handleDownloadTranscription}
                   isIntegratedView={true}
                 />
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
       </div>
-
-      {/* MODIFIED: TranscriptionExpandedPreview component is removed from the JSX */}
 
       {moveModalOpen && selectedTranscription && (
         <IntegrationFolderDialog

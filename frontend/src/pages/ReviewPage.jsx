@@ -215,8 +215,8 @@ export default function ReviewPage() {
     if (!transcriptionData) { return null; }
 
     const isIntegrated = transcriptionData.status === TRANSCRIPTION_STATUSES.INTEGRATED;
-    const canFinalize = [TRANSCRIPTION_STATUSES.DRAFT, TRANSCRIPTION_STATUSES.AWAITING_APPROVAL].includes(transcriptionData.status);
-    const canSaveAsDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
+    const inDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.DRAFT;
+    const awaitingApproval = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
 
     // MODIFIED: Removed dynamic grid class calculation as it's no longer needed and fragile.
     const hasProvisionContent = provisionContent && Object.keys(provisionContent).length > 0;
@@ -260,13 +260,13 @@ export default function ReviewPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <div className="lg:col-span-3 space-y-6">
-                    {!isIntegrated && transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL && (
+                    {!isIntegrated && awaitingApproval && (
                         <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 text-green-700 dark:text-green-300 p-4 rounded-md shadow-sm">
                             <CheckCircle className="h-5 w-5" />
                             <p className="ml-2 text-sm font-medium">Content is ready for your review.</p>
                         </div>
                     )}
-                    {!isIntegrated && transcriptionData.status === TRANSCRIPTION_STATUSES.DRAFT && (
+                    {!isIntegrated && inDraft && (
                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 text-yellow-800 dark:text-yellow-300 p-4 rounded-md shadow-sm">
                             <FileEdit className="h-5 w-5" />
                             <p className="ml-2 text-sm font-medium">This is a saved draft awaiting final integration.</p>
@@ -362,7 +362,7 @@ export default function ReviewPage() {
                             {highlights && (
                                 <div className="mt-4 p-2 rounded border bg-muted/20">
                                     <h4 className="font-semibold mb-2 text-primary">Highlights</h4>
-                                    <div className={`${isIntegrated ? "max-h-[108vh]" : "max-h-[50vh]"} overflow-y-auto`}>
+                                    <div className={`${isIntegrated ? "max-h-[108vh]" : inDraft ? "max-h-[57vh]": "max-h-[50vh]"} overflow-y-auto`}>
                                         <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlights}</ReactMarkdown>
                                         </div>
@@ -375,12 +375,12 @@ export default function ReviewPage() {
                         <Card>
                             <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
                             <CardContent className="space-y-2.5">
-                                {canFinalize && (
+                                {(awaitingApproval || inDraft) && (
                                     <Button size="sm" className="w-full" onClick={() => setIsFolderModalOpen(true)} disabled={isSaving}>
                                         Save & Finalize Integration
                                     </Button>
                                 )}
-                                {canSaveAsDraft && (
+                                {awaitingApproval && (
                                     <Button size="sm" variant="outline" className="w-full" onClick={handleSaveDraft} disabled={isSaving}>
                                         <Save className="mr-2 h-4 w-4" /> Save as Draft
                                     </Button>

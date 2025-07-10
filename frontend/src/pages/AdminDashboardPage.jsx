@@ -145,7 +145,7 @@ export default function AdminDashboardPage() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [activeStatusFilters, alert]);
+  }, [activeStatusFilters]);
 
   const cards = [
     { title: 'Pending Review', value: apiStats.pending, Icon: AlertTriangle, color: 'text-yellow-500' },
