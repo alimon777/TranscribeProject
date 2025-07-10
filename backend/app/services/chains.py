@@ -74,16 +74,16 @@ highlights = PromptTemplate(
     template="""
         You are an AI summarizer.
 
-        Refine and condense the following list of highlights from transcript chunks into a clear, organized summary.
-        - Group similar points logically under clear bolded headings.
-        - Use bullet points for individual insights.
-        - Avoid repetition.
-        - Output should be in markdown format.
+        Refine and condense the following list of highlights from transcript chunks into a clear, well-organized plain-text summary.
+
+        - Group similar points logically under clear, bold-style headings (just text, no Markdown).
+        - Use hyphenated bullet points (-) for individual insights.
+        - Do not repeat information.
+        - Maintain good spacing between sections for readability.
+        - Do NOT add Markdown or wrap the response in ``` or any other formatting blocks.
 
         Highlights:
         {chunk_highlights}
-
-        - do not add markdown to the response, and do not start or end with ```.
         """,
         input_variables=["chunk_highlights"]
     )

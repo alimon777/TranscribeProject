@@ -397,9 +397,15 @@ def delete_transcription(transcription_id: int, db: Session = Depends(get_db)):
     return {"message": f"Transcription {transcription_id} deleted successfully"}
 
 @router.get("/admin/conflicts", response_model=ConflictListWithStatsResponse)
-def get_conflicts(db: Session = Depends(get_db)):
-    conflicts = db.query(Conflict).all()
-    stats = calculate_conflict_stats(conflicts)
+def get_conflicts(status_filters: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    conflicts = db.query(Conflict)
+    query = conflicts.all()
+    stats = calculate_conflict_stats(query)
+    print("status", status_filters)
+    if status_filters:
+        status_list = status_filters.split(",")
+        conflicts = conflicts.filter(Conflict.status.in_(status_list))
+    conflicts = conflicts.all()
     return {"conflicts": [ConflictResponse.model_validate(c) for c in conflicts], "stats": stats}
 
 @router.get("/admin/conflicts/{conflict_id}/detail", response_model=ConflictResponse)

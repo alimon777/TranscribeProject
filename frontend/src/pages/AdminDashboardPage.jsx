@@ -121,16 +121,14 @@ export default function AdminDashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [chosenContent, setChosenContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeStatusFilters, setActiveStatusFilters] = useState(
-    new Set([LOCAL_CONFLICT_STATUSES.PENDING])
-  );
+  const [activeStatusFilters, setActiveStatusFilters] = useState(new Set());
 
   useEffect(() => {
     setIsLoading(true);
     const params = {
       status_filters: activeStatusFilters.size > 0 ? Array.from(activeStatusFilters).join(',') : undefined,
     };
-
+    console.log("it is getting called", params)
     getAdminConflicts(params)
       .then((data) => {
         setConflicts(data.conflicts || []);
@@ -242,6 +240,7 @@ export default function AdminDashboardPage() {
       else newFilters.delete(status);
       return newFilters;
     });
+
   };
 
   if (isLoading && conflicts.length === 0) {

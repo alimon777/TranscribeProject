@@ -78,8 +78,8 @@ export const deleteTranscription = (transcriptionId) => {
   return apiClient.delete(`/transcriptions/${transcriptionId}`);
 };
 
-export const getAdminConflicts = () => {
-  return apiClient.get('/admin/conflicts');
+export const getAdminConflicts = (params) => {
+  return apiClient.get('/admin/conflicts',{ params });
 };
 
 export const getConflictDetail = (conflictId) => {

@@ -50,6 +50,7 @@ import { usePopup } from '../components/PopupProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContextData } from '@/lib/ContextData';
 import { SESSION_PURPOSES } from '@/lib/constants';
+import { jsPDF } from "jspdf";
 
 export default function RepositoryPage() {
   const navigate = useNavigate();
@@ -173,18 +174,28 @@ export default function RepositoryPage() {
   };
 
   const handleDownloadTranscription = () => {
-    if (!selectedTranscription) return;
-    const content = `Title: ${selectedTranscription.title}\nPurpose: ${selectedTranscription.purpose || 'N/A'}\nIntegrated: ${new Date(selectedTranscription.updated_date).toLocaleString()}\n\n${selectedTranscription.transcript || 'No content available.'}`;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(selectedTranscription.title || 'transcription').replace(/\W/g, '_').toLowerCase()}_integrated.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  if (!selectedTranscription) return;
+ 
+  const doc = new jsPDF();
+ 
+  const title = `Title: ${selectedTranscription.title || 'N/A'}`;
+  const purpose = `Purpose: ${selectedTranscription.purpose || 'N/A'}`;
+  const date = `Integrated: ${new Date(selectedTranscription.updated_date).toLocaleString()}`;
+  const transcript = selectedTranscription.transcript || 'No content available.';
+ 
+  // Create the content
+  const content = `${title}\n${purpose}\n${date}\n\n${transcript}`;
+ 
+  // Add text to the PDF (splitting into multiple lines if needed)
+  const lines = doc.splitTextToSize(content, 180); // 180 adjusts for page margins
+  doc.text(lines, 10, 10);
+ 
+  // Create file name
+  const fileName = `${(selectedTranscription.title || 'transcription').replace(/\W/g, '_').toLowerCase()}_integrated.pdf`;
+ 
+  // Save the PDF
+  doc.save(fileName);
+};
   
   const isPreviewVisible = !!selectedTranscription;
 
