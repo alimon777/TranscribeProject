@@ -102,7 +102,6 @@ export default function ReviewPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [editedTranscription, setEditedTranscription] = useState('');
     const [editedQuiz, setEditedQuiz] = useState('');
-    // MODIFIED: State changed from string to object to handle key-value pairs
     const [provisionContent, setProvisionContent] = useState({});
     const [highlights, setHighlights] = useState('');
 
@@ -119,7 +118,6 @@ export default function ReviewPage() {
                 setTranscriptionData(data);
                 setEditedTranscription(data.transcript || '');
                 setEditedQuiz(data.quiz_content || '');
-                // MODIFIED: Handle object for provision_content, default to empty object
                 setProvisionContent(data.provision_content || {});
                 setHighlights(data.highlights || '');
             } catch (err) {
@@ -141,7 +139,6 @@ export default function ReviewPage() {
         });
     };
 
-    // MODIFIED: New handler to update a specific key in the provisionContent state
     const handleProvisionChange = (key, value) => {
         setProvisionContent(prev => ({
             ...prev,
@@ -186,7 +183,7 @@ export default function ReviewPage() {
                 updateData
             );
             alert(res.message || 'Integration finalized successfully!');
-            navigate('/repository');
+            navigate('/pending-reviews');
         } catch (err) {
             alert(err.detail || 'Failed to finalize integration.');
         } finally {
@@ -218,7 +215,6 @@ export default function ReviewPage() {
     const inDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.DRAFT;
     const awaitingApproval = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
 
-    // MODIFIED: Removed dynamic grid class calculation as it's no longer needed and fragile.
     const hasProvisionContent = provisionContent && Object.keys(provisionContent).length > 0;
     const hasQuizContent = editedQuiz && Object.keys(editedQuiz).length > 0
 
@@ -277,7 +273,6 @@ export default function ReviewPage() {
                         <CardHeader><CardTitle>Content</CardTitle></CardHeader>
                         <CardContent>
                             <Tabs defaultValue="transcription" className="w-full">
-                                {/* MODIFIED: TabsList now renders dynamic tabs for provision content */}
                                 <TabsList className="h-auto flex-wrap">
                                     <TabsTrigger value="transcription">Transcription</TabsTrigger>
                                     {hasProvisionContent && Object.keys(provisionContent).map(key => (
@@ -289,11 +284,10 @@ export default function ReviewPage() {
                                     <Textarea value={editedTranscription} onChange={(e) => setEditedTranscription(e.target.value)} rows={20} className="max-h-[100vh] font-mono whitespace-pre-wrap" disabled={isIntegrated} />
                                 </TabsContent>
 
-                                {/* MODIFIED: Dynamically render TabsContent for each provision item */}
                                 {hasProvisionContent && Object.entries(provisionContent).map(([key, value]) => (
                                     <TabsContent key={key} value={key} className="mt-4">
                                         <Textarea
-                                            value={value || ''} // Use empty string for null values to avoid React errors
+                                            value={value || ''}
                                             onChange={(e) => handleProvisionChange(key, e.target.value)}
                                             rows={20}
                                             className="font-mono whitespace-pre-wrap max-h-[100vh]"
@@ -359,14 +353,23 @@ export default function ReviewPage() {
                                         <strong>Status:</strong> <StatusBadge status={transcriptionData.status} />
                                     </div>
                                 </div></>}
+                            {/* MODIFIED: Highlights section is now conditionally editable */}
                             {highlights && (
-                                <div className="mt-4 p-2 rounded border bg-muted/20">
-                                    <h4 className="font-semibold mb-2 text-primary">Highlights</h4>
-                                    <div className={`${isIntegrated ? "max-h-[108vh]" : inDraft ? "max-h-[57vh]": "max-h-[50vh]"} overflow-y-auto`}>
-                                        <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlights}</ReactMarkdown>
-                                        </div>
-                                    </div>
+                                <div className="bg-muted/20 h-full">
+                                    <h4 className="font-semibold mb-2 text-primary ml-1">Highlights</h4>
+                                    <Textarea
+                                        value={highlights}
+                                        onChange={(e) => setHighlights(e.target.value)}
+                                        placeholder="Edit highlights using Markdown..."
+                                        rows={15}
+                                        className={
+                                            `w-full font-mono whitespace-pre-wrap ${isIntegrated ? "max-h-[113vh]" : (inDraft ? "max-h-[60vh]" : "max-h-[53vh]")
+                                            }`
+                                        }
+
+
+                                        disabled={isIntegrated}
+                                    />
                                 </div>
                             )}
                         </CardContent>

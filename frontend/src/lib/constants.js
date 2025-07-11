@@ -20,12 +20,12 @@ export const TRANSCRIPTION_STATUSES = {
 };
 
 
-export const LOCAL_ANOMALY_TYPES = {
-  SEMANTIC_DIFFERENCE: "Semantic Difference",
-  OVERLAP: "Significant Overlap",
-  CONTRADICTION: "Contradiction",
-  OUTDATED_INFO: "Outdated Information",
-};
+// export const LOCAL_ANOMALY_TYPES = {
+//   SEMANTIC_DIFFERENCE: "Semantic Difference",
+//   OVERLAP: "Significant Overlap",
+//   CONTRADICTION: "CONTRADICTION",
+//   OUTDATED_INFO: "Outdated Information",
+// };
 
 export const LOCAL_CONFLICT_STATUSES = {
   PENDING: "Pending Review",

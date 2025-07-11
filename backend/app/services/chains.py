@@ -127,38 +127,57 @@ chain = prompt | model | provision_parser
 
 conflict_prompt = PromptTemplate(
     template="""
-        You are an AI assistant tasked with detecting **true contradictions or factual anomalies** between two transcript chunks.
-
+        You are an AI assistant detecting **true contradictions or anomalies** between two transcript chunks.
+        
         Below are two sets of summarized facts from separate transcript sections:
-
+        
         Summary A (new transcript chunk):
         {facts_a}
-
+        
         Summary B (existing transcript chunk):
         {facts_b}
-
-        Your task:
-        - Compare both summaries carefully.
-        - Only return results if there are **meaningful contradictions or factual mismatches**.
-        - Ignore statements that are **paraphrased**, **semantically similar**, or express the **same idea** in different words — these are NOT conflicts.
-
-        Return a result ONLY if one or more of the following anomalies are clearly present:
-        - **CONTRADICTION**: The two summaries clearly assert opposing facts.
-        - **OUTDATED_INFO**: One summary reflects updated or corrected information that invalidates the other.
-        - **SEMANTIC_DIFFERENCE**: Subtle but important difference in meaning, intent, or interpretation — only if it could change downstream understanding or decisions.
-
-        DO NOT return results for:
-        - Rephrased or overlapping content
-        - Slight variations in wording that preserve the same meaning
-
-        If a conflict is found, return:
-        - **new_code**: The exact sentence from Summary A's corresponding transcript chunk (verbatim).
-        - **existing_code**: The exact sentence from Summary B's corresponding transcript chunk (verbatim).
-        - **anomaly**: One of: CONTRADICTION, OUTDATED_INFO, SEMANTIC_DIFFERENCE
-
+        
+        ---
+        
+        ### Your Task:
+        
+        Carefully compare both summaries and return a list of conflicts **only if there are genuine contradictions, outdated facts, or semantic mismatches**.
+        
+        Return a conflict **only when**:
+        - There is a **clear contradiction** between statements (e.g., opposite facts)
+        - A **factual inconsistency** exists (e.g., different outcomes, decisions, numbers)
+        - There is a **semantic difference** that alters the original meaning
+        - The information in Summary B is **outdated or invalidated** by Summary A
+        
+        ---
+        
+        ### Do NOT return a conflict if:
+        - The content is **rephrased** or **synonymous**
+        - There's **general overlap** or repeated ideas with the same intent
+        - There is **no significant factual difference**
+        - The difference is purely **stylistic, tonal, or emphasis-based**
+        
+        ---
+        
+        ### Output Requirements:
+        
+        If a conflict is found, return a list of dictionaries using this format:
+        
+        - **new_code**: The exact sentence from Summary A's transcript chunk.
+        - **existing_code**: The exact sentence from Summary B's transcript chunk.
+        - **anomaly**: One of the following:
+        - CONTRADICTION
+        - SIGNIFICANT_OVERLAP
+        - SEMANTIC_DIFFERENCE
+        - OUTDATED_INFO
+        
+        These sentences must be taken **verbatim** from the transcript chunks to support string matching and accurate localization.
+        
+        If there are **no valid conflicts**, return an empty list (`[]`).
+        
         {format_instructions}
         """,
-        input_variables=["facts_a", "facts_b"],
-        partial_variables={"format_instructions": conflict_parser.get_format_instructions()}
+            input_variables=["facts_a", "facts_b"],
+            partial_variables={"format_instructions": conflict_parser.get_format_instructions()}
     )
 conflict_chain = conflict_prompt | model | conflict_parser

@@ -41,7 +41,7 @@ export const getPendingReviewTranscriptions = (params) => {
   return apiClient.get('/transcriptions/pending-reviews', { params });
 };
 
-export const getReviewHistoryTranscriptions = (params) => {
+export const getApprovedDraftTranscriptions = (params) => {
   return apiClient.get('/transcriptions/review-history', { params });
 };
 

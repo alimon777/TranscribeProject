@@ -37,7 +37,8 @@ import {
 } from '../services/apiClient';
 import { usePopup } from '../components/PopupProvider';
 import CardIllustration from '@/svg_components/CardsIllustration';
-import { LOCAL_ANOMALY_TYPES, LOCAL_CONFLICT_STATUSES } from '@/lib/constants';
+import { LOCAL_CONFLICT_STATUSES } from '@/lib/constants';
+import StatusBadge from '@/components/StatusBadge';
 
 const AdminDashboardSkeleton = () => {
   return (
@@ -329,24 +330,12 @@ export default function AdminDashboardPage() {
                       <TableHead>New Content</TableHead>
                       <TableHead>Existing Content</TableHead>
                       <TableHead>Anomaly</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Updated At</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {conflicts.map((c) => {
-                      let anomalyClass = 'text-[10px] py-0.5 px-1.5 rounded-full ';
-                      if (c.anomaly_type === LOCAL_ANOMALY_TYPES.SEMANTIC_DIFFERENCE) anomalyClass += 'bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300';
-                      else if (c.anomaly_type === LOCAL_ANOMALY_TYPES.OVERLAP) anomalyClass += 'bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300';
-                      else anomalyClass += 'bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300';
-
-                      let statusClass = 'py-0.5 px-1.5 rounded-full text-[10px] ';
-                      if (c.status === LOCAL_CONFLICT_STATUSES.PENDING) statusClass += 'bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300';
-                      else if (c.status?.startsWith('Resolved')) statusClass += 'bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300';
-                      else if (c.status?.startsWith('Rejected')) statusClass += 'bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300';
-                      else statusClass += 'bg-gray-100 text-gray-600';
-
                       return (
                         <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openConflict(c.id)}>
                           <TableCell className="py-2">
@@ -357,14 +346,9 @@ export default function AdminDashboardPage() {
                             {c.existing_transcription_title}
                             <div className="text-[11px] text-muted-foreground truncate max-w-xs">{c.existing_content_snippet}</div>
                           </TableCell>
-                          <TableCell className="py-2"><span className={anomalyClass}>{c.anomaly_type}</span></TableCell>
-                          <TableCell className="py-2">{new Date(c.updated_date).toLocaleDateString()}</TableCell>
-                          <TableCell className="py-2"><span className={statusClass}>{c.status}</span></TableCell>
-                          <TableCell className="text-right py-2 pr-6">
-                            <Button variant="outline" size="xs" onClick={(e) => { e.stopPropagation(); openConflict(c.id); }}>
-                              <Ellipsis size={12} />
-                            </Button>
-                          </TableCell>
+                          <TableCell className="py-2"><StatusBadge status={c.anomaly_type} /></TableCell>
+                          <TableCell className="py-2">{new Date(c.updated_date).toLocaleString()}</TableCell>
+                          <TableCell className="py-2"><StatusBadge status={c.status} /></TableCell>
                         </TableRow>
                       );
                     })}

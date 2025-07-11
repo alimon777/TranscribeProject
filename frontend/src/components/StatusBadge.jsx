@@ -1,12 +1,20 @@
+// StatusBadge.js (Updated)
+
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { TRANSCRIPTION_STATUSES } from '@/lib/constants';
+import { 
+  TRANSCRIPTION_STATUSES, 
+  // LOCAL_ANOMALY_TYPES, 
+  LOCAL_CONFLICT_STATUSES 
+} from '@/lib/constants';
 
 export default function StatusBadge({ status }) {
-  // A helper function could also be used here to map status to styles
   const getStatusProps = () => {
+    const chipBaseStyle = "text-[10px] py-0.5 px-1.5 rounded-full border-0 font-medium";
+
     switch (status) {
+      // Original Transcription Statuses
       case TRANSCRIPTION_STATUSES.DRAFT:
         return {
           variant: "outline",
@@ -43,7 +51,51 @@ export default function StatusBadge({ status }) {
           variant: "secondary",
           className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
           text: "Integration InProcess",
+          icon: <Loader2 className="h-3 w-3 mr-1 animate-spin" />,
         };
+      
+      // NEW: Anomaly Types for Admin Dashboard
+      case "SEMANTIC_DIFFERENCE":
+        return {
+          variant: "secondary",
+          className: `${chipBaseStyle} bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300`,
+          text: status,
+        };
+      case "OVERLAP":
+        return {
+          variant: "secondary",
+          className: `${chipBaseStyle} bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300`,
+          text: status,
+        };
+      case "CONTRADICTION":
+      case "OUTDATED_INFO":
+        return {
+          variant: "secondary",
+          className: `${chipBaseStyle} bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300`,
+          text: status,
+        };
+      
+      // NEW: Conflict Statuses for Admin Dashboard
+      case LOCAL_CONFLICT_STATUSES.PENDING:
+         return {
+          variant: "secondary",
+          className: `${chipBaseStyle} bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300`,
+          text: status,
+        };
+      case LOCAL_CONFLICT_STATUSES.RESOLVED_MERGED:
+        return {
+          variant: "secondary",
+          className: `${chipBaseStyle} bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300`,
+          text: status,
+        };
+      case LOCAL_CONFLICT_STATUSES.REJECTED:
+        return {
+          variant: "secondary",
+          className: `${chipBaseStyle} bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300`,
+          text: status,
+        };
+
+      // Fallback for any unknown status
       default:
         return {
           variant: "secondary",
