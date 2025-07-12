@@ -94,7 +94,7 @@ export default function HomePage() {
                 <Button
                   variant={buttonVariant}
                   size="sm"
-                  className="w-full"
+                  className="w-full cursor-pointer"
                   onClick={() => navigate(link)}
                 >
                   {buttonText}

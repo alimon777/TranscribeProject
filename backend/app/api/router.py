@@ -537,6 +537,7 @@ def reject_conflict(conflict_id: int, db: Session = Depends(get_db)):
     if not conflict:
         raise HTTPException(status_code=404, detail="Conflict not found")
     conflict.status = ConflictStatusEnum.REJECTED
+    conflict.updated_date = func.now()
     db.commit()
     db.refresh(conflict)
     all_conflicts = db.query(Conflict).all()

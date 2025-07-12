@@ -89,7 +89,7 @@ const TreeItem = React.memo(({
   return (
     <li role="treeitem" aria-expanded={canToggle ? isExpanded : undefined} aria-selected={isSelected} className="list-none">
       <div
-        className={cn("flex items-center gap-1 py-1 pr-1 rounded group mb-0.5", {
+        className={cn("flex items-center gap-1 py-1 pr-1 rounded group mb-0.5 cursor-pointer", {
           "hover:bg-accent": !isRenaming,
           "bg-accent": isSelected
         })}
@@ -137,22 +137,19 @@ const TreeItem = React.memo(({
         {enableEditing && isFolderItem && !isRenaming && (
           <DropdownMenu onOpenChange={(open) => open && onSelectNode?.(item.id)}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 cursor-pointer">
                 <MoreHorizontal className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onStartRename(item.id, item.name)}>
+              <DropdownMenuItem onClick={() => onStartRename(item.id, item.name)} className="cursor-pointer">
                 <Edit2 className="h-3 w-3 mr-1" /> Rename
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onTriggerAddSubfolder(item.id)}>
+              <DropdownMenuItem onClick={() => onTriggerAddSubfolder(item.id)} className="cursor-pointer">
                 <FolderPlus className="h-3 w-3 mr-1" /> Add Subfolder
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDeleteNode(item.id, item.name)}
-                className="text-destructive"
-              >
+              <DropdownMenuItem onClick={() => onDeleteNode(item.id, item.name)} className="text-destructive cursor-pointer">
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -342,7 +339,7 @@ export const TreeView = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 flex-shrink-0"
+            className="h-9 w-9 flex-shrink-0 cursor-pointer"
             onClick={(e) => {
               e.preventDefault();
               handleRootAddCommit();

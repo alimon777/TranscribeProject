@@ -64,7 +64,7 @@ function CurrentQueueCard({ items, onRefresh, isRefreshing, lastUpdate }) {
         <Card className="lg:col-span-1 gap-0 pb-0">
             <CardHeader className="flex flex-row justify-between items-center pb-2">
                 <div className="flex items-center gap-3">
-                    <Logs size={20} className="text-muted-foreground" />
+                    <Logs size={20} className="text-blue-500" />
                     <div>
                         <CardTitle className="text-lg">Current Queue</CardTitle>
                         <CardDescription className="text-xs">
@@ -86,7 +86,7 @@ function CurrentQueueCard({ items, onRefresh, isRefreshing, lastUpdate }) {
                         <p className="text-muted-foreground -mt-10 text-sm">No items currently pending.</p>
                     </div>
                 ) : (
-                    <div className="h-[45vh] overflow-y-auto p-4">
+                    <div className="h-[45vh] overflow-y-auto p-4 pt-0">
                         <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
@@ -123,7 +123,7 @@ function IntegratedDraftsConflictsCard({ historyItems, draftItems, conflictItems
 
     const cardConfig = {
         history: {
-            icon: <History size={20} className="text-muted-foreground" />,
+            icon: <History size={20} className="text-green-500" />,
             title: 'Review Integrated',
             description: 'Successfully integrated items.',
             items: historyItems,
@@ -131,7 +131,7 @@ function IntegratedDraftsConflictsCard({ historyItems, draftItems, conflictItems
             dateLabel: 'Updated At',
         },
         drafts: {
-            icon: <FileEdit size={20} className="text-muted-foreground" />,
+            icon: <FileEdit size={20} className="text-yellow-500" />,
             title: 'Saved Drafts',
             description: 'Items you have saved to finish later.',
             items: draftItems,
@@ -169,9 +169,9 @@ function IntegratedDraftsConflictsCard({ historyItems, draftItems, conflictItems
                         value={activeTab}
                         onValueChange={(value) => { if (value) setActiveTab(value); }}
                     >
-                        <ToggleGroupItem value="history" aria-label="View history" className="px-3">Integrated</ToggleGroupItem>
-                        <ToggleGroupItem value="drafts" aria-label="View drafts" className="px-0">Drafts</ToggleGroupItem>
-                        <ToggleGroupItem value="conflicts" aria-label="View conflicts" className="px-2">Conflicts</ToggleGroupItem>
+                        <ToggleGroupItem value="history" aria-label="View history" className="px-3 cursor-pointer">Integrated</ToggleGroupItem>
+                        <ToggleGroupItem value="drafts" aria-label="View drafts" className="px-0 cursor-pointer">Drafts</ToggleGroupItem>
+                        <ToggleGroupItem value="conflicts" aria-label="View conflicts" className="px-2 cursor-pointer">Conflicts</ToggleGroupItem>
                     </ToggleGroup>
                 </div>
             </CardHeader>
@@ -182,7 +182,7 @@ function IntegratedDraftsConflictsCard({ historyItems, draftItems, conflictItems
                         <p className="text-muted-foreground -mt-10 text-sm">{currentView.emptyMessage}</p>
                     </div>
                 ) : (
-                    <div className="h-[45vh] overflow-y-auto p-4">
+                    <div className="h-[45vh] overflow-y-auto p-4 pt-0">
                         <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
@@ -326,10 +326,10 @@ export default function PendingReviewsPage() {
 
         return () => clearInterval(intervalId);
 
-    }, [itemsToPoll]); // <-- REPLACED: Dependency is now alert
+    }, [itemsToPoll]); 
 
     return (
-        <div className="pt-4 md:p-6 w-full">
+        <div className="pt-4 md:p-6 w-full mb-10">
             <div className="mb-6">
                 <h1 className="text-3xl font-semibold mb-1">Pending Reviews & In-Progress</h1>
                 <p className="text-muted-foreground">Track transcriptions being processed or awaiting review.</p>

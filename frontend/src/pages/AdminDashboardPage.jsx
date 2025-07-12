@@ -56,56 +56,6 @@ import CardIllustration from '@/svg_components/CardsIllustration';
 import { CONFLICT_STATUSES, ANOMALY_TYPES } from '@/lib/constants';
 import StatusBadge from '@/components/StatusBadge';
 
-/**
- * Skeleton component for the initial page load.
- * This version uses a single block for the table area as requested.
- */
-const AdminDashboardSkeleton = () => {
-  return (
-    <div className="p-4 md:p-6 w-full animate-pulse">
-      <div className="mb-6">
-        <Skeleton className="h-8 w-1/3 mb-2" />
-        <Skeleton className="h-5 w-1/2" />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row justify-between items-center pb-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-6 w-6" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-7 w-12" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-             <div>
-               <Skeleton className="h-6 w-1/4 mb-2" />
-               <Skeleton className="h-4 w-1/3" />
-             </div>
-             <div className="flex items-center gap-2 w-full md:w-auto">
-                <Skeleton className="h-9 w-[150px] lg:w-[200px]" />
-                <Skeleton className="h-9 w-[130px]" />
-                <Skeleton className="h-9 w-9" />
-                <Skeleton className="h-9 w-24" />
-             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-           {/* Single skeleton block representing the entire table area */}
-           <Skeleton className="h-64 w-full" />
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
 export default function AdminDashboardPage() {
   const [conflicts, setConflicts] = useState([]);
   const [apiStats, setApiStats] = useState({ pending: 0, resolved: 0, rejected: 0, total: 0 });
@@ -122,7 +72,7 @@ export default function AdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('updated_at');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortOrder, setSortOrder] = useState('asc');
   const [activeStatusFilters, setActiveStatusFilters] = useState(new Set());
   const [activeAnomalyFilters, setActiveAnomalyFilters] = useState(new Set());
 
@@ -181,8 +131,66 @@ export default function AdminDashboardPage() {
       .finally(() => setIsDetailLoading(false));
   };
 
-  const handleResolve = () => { /* ... unchanged ... */ };
-  const handleReject = async () => { /* ... unchanged ... */ };
+  const handleResolve = () => {
+    if (!detail) return;
+    setIsSubmitting(true);
+
+    const payload = {
+      resolution_content: chosenContent,
+      status: CONFLICT_STATUSES.RESOLVED_MERGED
+    };
+
+    resolveConflict(detail.id, payload)
+      .then((response) => {
+        const resolvedConflictData = response.resolved_conflict;
+        const newStats = response.updated_stats;
+        const message = response?.message;
+        setConflicts((prev) => prev.filter((c) => c.id !== resolvedConflictData.id));
+        setApiStats(newStats || apiStats);
+        if (message)
+          alert(`Conflict resolved and ${message} integrated successfully.`);
+        else
+          alert('Conflict resolved successfully.');
+        setIsModalOpen(false);
+        setDetail(null);
+      })
+      .catch((error) => {
+        console.error(`Failed to resolve conflict ID ${detail.id}:`, error);
+        alert(`Resolution failed: ${error.detail || error.message}`);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
+  };
+
+  const handleReject = async () => {
+    if (!detail) return;
+    const ok = await confirm('Are you sure you want to reject this conflict? This cannot be undone.');
+    if (!ok) return;
+
+    setIsSubmitting(true);
+    rejectConflict(detail.id)
+      .then((response) => {
+        const rejectedConflictData = response.rejected_conflict;
+        const newStats = response.updated_stats;
+        const message = response?.message;
+        setConflicts((prev) => prev.filter((c) => c.id !== rejectedConflictData.id));
+        setApiStats(newStats || apiStats);
+        if (message)
+          alert(`Conflict rejected and ${message} integrated successfully.`);
+        else
+          alert('Conflict has been rejected.');
+        setIsModalOpen(false);
+        setDetail(null);
+      })
+      .catch((error) => {
+        console.error(`Failed to reject conflict ID ${detail.id}:`, error);
+        alert(`Rejection failed: ${error.detail || error.message}`);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
+  };
 
   const handleFilterChange = (setter, value, checked) => {
     setter((prevFilters) => {
@@ -191,19 +199,15 @@ export default function AdminDashboardPage() {
       return newFilters;
     });
   };
-  
+
   const toggleSortOrder = () => setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'));
   const totalActiveFilters = activeStatusFilters.size + activeAnomalyFilters.size;
   const formatAnomalyName = (name) => name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  
+
   const clearAllFilters = () => {
     setActiveStatusFilters(new Set());
     setActiveAnomalyFilters(new Set());
   };
-
-  if (isInitialLoading) {
-    return <AdminDashboardSkeleton />;
-  }
 
   return (
     <>
@@ -225,46 +229,46 @@ export default function AdminDashboardPage() {
         </div>
         <Card className="overflow-hidden">
           <CardHeader>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle>
-                    Disputed Content & Anomalies
-                    {totalActiveFilters > 0 && (<Badge variant="secondary" className="ml-2 font-normal text-xs align-middle">{totalActiveFilters} Filter{totalActiveFilters > 1 && 's'} Active</Badge>)}
-                  </CardTitle>
-                  <CardDescription className="text-xs pt-1">Review, filter, and resolve integration conflicts. Click a row for details.</CardDescription>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                  <Input placeholder="Search conflicts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-9 flex-grow md:flex-grow-0 md:w-[150px] lg:w-[200px]"/>
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-[130px] h-9" aria-label="Sort by"><SelectValue placeholder="Sort by" /></SelectTrigger>
-                    <SelectContent><SelectItem value="updated_at">Updated Date</SelectItem></SelectContent>
-                  </Select>
-                  <Button variant="outline" size="icon" onClick={toggleSortOrder} className="h-9 w-9" aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}>
-                    {sortOrder === 'asc' ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownNarrowWide className="h-4 w-4" />}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 gap-1 relative">
-                        <ListFilter className="h-3.5 w-3.5" />
-                        {totalActiveFilters > 0 && (<span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-primary text-primary-foreground text-[8px] items-center justify-center">{totalActiveFilters}</span></span>)}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {Object.values(CONFLICT_STATUSES).map((status) => (<DropdownMenuCheckboxItem key={status} checked={activeStatusFilters.has(status)} onCheckedChange={(checked) => handleFilterChange(setActiveStatusFilters, status, Boolean(checked))}>{status}</DropdownMenuCheckboxItem>))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel>Filter by Anomaly Type</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {Object.values(ANOMALY_TYPES).map((type) => (<DropdownMenuCheckboxItem key={type} checked={activeAnomalyFilters.has(type)} onCheckedChange={(checked) => handleFilterChange(setActiveAnomalyFilters, type, Boolean(checked))}>{formatAnomalyName(type)}</DropdownMenuCheckboxItem>))}
-                      {totalActiveFilters > 0 && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:bg-destructive/10" onSelect={clearAllFilters}><FilterX className="h-4 w-4 mr-2" />Clear All Filters</DropdownMenuItem></>)}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <CardTitle>
+                  Disputed Content & Anomalies
+                  {totalActiveFilters > 0 && (<Badge variant="secondary" className="ml-2 font-normal text-xs align-middle">{totalActiveFilters} Filter{totalActiveFilters > 1 && 's'} Active</Badge>)}
+                </CardTitle>
+                <CardDescription className="text-xs pt-1">Review, filter, and resolve integration conflicts. Click a row for details.</CardDescription>
               </div>
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <Input placeholder="Search conflicts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-9 flex-grow md:flex-grow-0 md:w-[150px] lg:w-[200px]" />
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[130px] h-9 cursor-pointer" aria-label="Sort by"><SelectValue placeholder="Sort by" /></SelectTrigger>
+                  <SelectContent><SelectItem value="updated_at">Updated Date</SelectItem></SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" onClick={toggleSortOrder} className="h-9 w-9 cursor-pointer" aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}>
+                  {sortOrder === 'asc' ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownNarrowWide className="h-4 w-4" />}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 gap-1 relative cursor-pointer">
+                      <ListFilter className="h-3.5 w-3.5" />
+                      {totalActiveFilters > 0 && (<span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-primary text-primary-foreground text-[8px] items-center justify-center">{totalActiveFilters}</span></span>)}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {Object.values(CONFLICT_STATUSES).map((status) => (<DropdownMenuCheckboxItem className="cursor-pointer" key={status} checked={activeStatusFilters.has(status)} onCheckedChange={(checked) => handleFilterChange(setActiveStatusFilters, status, Boolean(checked))}>{status}</DropdownMenuCheckboxItem>))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Filter by Anomaly Type</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {Object.values(ANOMALY_TYPES).map((type) => (<DropdownMenuCheckboxItem className="cursor-pointer" key={type} checked={activeAnomalyFilters.has(type)} onCheckedChange={(checked) => handleFilterChange(setActiveAnomalyFilters, type, Boolean(checked))}>{formatAnomalyName(type)}</DropdownMenuCheckboxItem>))}
+                    {totalActiveFilters > 0 && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer" onSelect={clearAllFilters}><FilterX className="h-4 w-4 mr-2" />Clear All Filters</DropdownMenuItem></>)}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[70vh] overflow-y-auto">
+            <div className="max-h-[50vh] overflow-y-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
@@ -285,8 +289,8 @@ export default function AdminDashboardPage() {
                   ) : conflicts.length > 0 ? (
                     conflicts.map((c) => (
                       <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openConflict(c.id)}>
-                        <TableCell className="py-2">{c.new_transcription_title}<div className="text-[11px] text-muted-foreground truncate max-w-xs">{c.new_content_snippet}</div></TableCell>
-                        <TableCell className="py-2">{c.existing_transcription_title}<div className="text-[11px] text-muted-foreground truncate max-w-xs">{c.existing_content_snippet}</div></TableCell>
+                        <TableCell className="py-2">{c.new_transcription_title}<div className="text-[11px] text-muted-foreground truncate max-w-[310px]">{c.new_content_snippet}</div></TableCell>
+                        <TableCell className="py-2">{c.existing_transcription_title}<div className="text-[11px] text-muted-foreground truncate max-w-[310px]">{c.existing_content_snippet}</div></TableCell>
                         <TableCell className="py-2"><StatusBadge status={c.anomaly_type} /></TableCell>
                         <TableCell className="py-2">{new Date(c.updated_date).toLocaleString()}</TableCell>
                         <TableCell className="py-2"><StatusBadge status={c.status} /></TableCell>
@@ -315,7 +319,7 @@ export default function AdminDashboardPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {isDetailLoading && ( <div className="p-4 text-center"> <Skeleton className="h-6 w-1/2 mx-auto mb-4" /> <Skeleton className="h-32 w-full mt-2 mb-2" /> <Skeleton className="h-32 w-full mt-2" /> </div> )}
+          {isDetailLoading && (<div className="p-4 text-center"> <Skeleton className="h-6 w-1/2 mx-auto mb-4" /> <Skeleton className="h-32 w-full mt-2 mb-2" /> <Skeleton className="h-32 w-full mt-2" /> </div>)}
 
           {!isDetailLoading && detail && (
             <>
@@ -359,13 +363,15 @@ export default function AdminDashboardPage() {
               </div>
 
               <DialogFooter className="flex justify-end space-x-2 pt-0">
-                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <DialogClose asChild>
+                  <Button variant="outline" className="cursor-pointer">Cancel</Button>
+                  </DialogClose>
                 {detail.status === CONFLICT_STATUSES.PENDING && (
                   <>
-                    <Button variant="destructive" onClick={handleReject} disabled={isSubmitting}>
+                    <Button variant="destructive" className="cursor-pointer" onClick={handleReject} disabled={isSubmitting}>
                       {isSubmitting ? 'Submitting…' : 'Reject'}
                     </Button>
-                    <Button onClick={handleResolve} disabled={isSubmitting || !chosenContent.trim()}>
+                    <Button onClick={handleResolve}  className="cursor-pointer" disabled={isSubmitting || !chosenContent.trim()}>
                       {isSubmitting ? 'Submitting…' : 'Mark as Resolved'}
                     </Button>
                   </>
@@ -373,7 +379,7 @@ export default function AdminDashboardPage() {
               </DialogFooter>
             </>
           )}
-          {!isDetailLoading && !detail && ( <div className="p-4 text-center text-muted-foreground">Could not load conflict details.</div> )}
+          {!isDetailLoading && !detail && (<div className="p-4 text-center text-muted-foreground">Could not load conflict details.</div>)}
         </DialogContent>
       </Dialog>
     </>

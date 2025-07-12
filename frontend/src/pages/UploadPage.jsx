@@ -82,12 +82,12 @@ const MetadataForm = forwardRef((props, ref) => {
                     <label htmlFor="sessionPurpose" className="text-sm font-medium text-foreground mb-1.5 block">Session Purpose</label>
                     {/* UPDATED: Use the new handler and a valid value for the clear option */}
                     <Select value={sessionPurpose} onValueChange={handlePurposeChange}>
-                        <SelectTrigger className='w-full'><SelectValue placeholder="Select session purpose" /></SelectTrigger>
+                        <SelectTrigger className='w-full cursor-pointer'><SelectValue placeholder="Select session purpose" /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="__clear__" className="text-muted-foreground italic">
+                            <SelectItem value="__clear__" className="text-muted-foreground italic cursor-pointer">
                                 Clear selection
                             </SelectItem>
-                            {SESSION_PURPOSES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                            {SESSION_PURPOSES.map((p) => <SelectItem key={p} value={p} className="cursor-pointer">{p}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>

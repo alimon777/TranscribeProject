@@ -199,24 +199,6 @@ export default function RepositoryPage() {
   
   const isPreviewVisible = !!selectedTranscription;
 
-  if (isLoading && transcriptions.length === 0 && treeData.length === 0) {
-    return (
-      <div className="p-4 md:p-6 w-full">
-        <Skeleton className="h-10 w-1/3 mb-4" />
-        <div className="flex flex-col md:flex-row gap-6">
-          <aside className="w-full md:w-64 border rounded p-2 flex-shrink-0">
-            <Skeleton className="h-8 w-1/2 ml-3 mb-4" />
-            <Skeleton className="h-40 w-full" />
-          </aside>
-          <section className="flex-1 space-y-4 min-w-0">
-            <Skeleton className="h-10 w-full mb-4" />
-            <Skeleton className="h-64 w-full" />
-          </section>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-6 w-full">
       <div className="mb-6">
@@ -229,7 +211,7 @@ export default function RepositoryPage() {
           <div className="flex justify-between items-center py-2 px-3 mb-2">
             <h2 className="font-medium">Directory</h2>
             <button
-              className="text-xs font-medium text-primary hover:underline focus:outline-none"
+              className="text-xs font-medium text-primary hover:underline focus:outline-none cursor-pointer"
               onClick={() => {
                 setSelectedFolder('all');
                 setSelectedTranscription(null);
@@ -274,7 +256,7 @@ export default function RepositoryPage() {
           <div className="flex gap-2 items-center">
             <Input placeholder="Search integrated content..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-grow" />
             <Select value={sortField} onValueChange={setSortField}>
-              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Sort by..." /></SelectTrigger>
+              <SelectTrigger className="w-[180px] cursor-pointer"><SelectValue placeholder="Sort by..." /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="session_title">Title</SelectItem>
                 <SelectItem value="integrated_at">Integrated Date</SelectItem>
@@ -283,12 +265,12 @@ export default function RepositoryPage() {
                 <SelectItem value="session_purpose">Purpose</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={toggleSortOrder} aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}>
+            <Button className="cursor-pointer" variant="outline" size="icon" onClick={toggleSortOrder} aria-label={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}>
               {sortOrder === 'asc' ? <ArrowUpNarrowWide className="h-4 w-4" /> : <ArrowDownNarrowWide className="h-4 w-4" />}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="relative" aria-label="Filter by purpose">
+                <Button variant="outline" className="relative cursor-pointer" aria-label="Filter by purpose">
                   <ListFilter className="h-4 w-4" />
                   {activePurposeFilters.size > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -302,14 +284,14 @@ export default function RepositoryPage() {
                 <DropdownMenuLabel>Filter by Session Purpose</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {SESSION_PURPOSES.map((purpose) => (
-                  <DropdownMenuCheckboxItem key={purpose} checked={activePurposeFilters.has(purpose)} onCheckedChange={(checked) => handlePurposeFilterChange(purpose, Boolean(checked))}>
+                  <DropdownMenuCheckboxItem className="cursor-pointer" key={purpose} checked={activePurposeFilters.has(purpose)} onCheckedChange={(checked) => handlePurposeFilterChange(purpose, Boolean(checked))}>
                     {purpose}
                   </DropdownMenuCheckboxItem>
                 ))}
                 {activePurposeFilters.size > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onSelect={(e) => { e.preventDefault(); setActivePurposeFilters(new Set()); }}>
+                    <DropdownMenuItem className="text-destructive cursor-pointer" onSelect={(e) => { e.preventDefault(); setActivePurposeFilters(new Set()); }}>
                       <FilterX className="h-4 w-4 mr-2" />
                       Clear Purpose Filters
                     </DropdownMenuItem>

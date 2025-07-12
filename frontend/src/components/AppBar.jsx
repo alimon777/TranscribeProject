@@ -84,7 +84,7 @@ export default function AppBar() {
           ))}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="cursor-pointer">
                 <User className="h-5 w-5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>

@@ -214,6 +214,7 @@ export default function ReviewPage() {
     const isIntegrated = transcriptionData.status === TRANSCRIPTION_STATUSES.INTEGRATED;
     const inDraft = transcriptionData.status === TRANSCRIPTION_STATUSES.DRAFT;
     const awaitingApproval = transcriptionData.status === TRANSCRIPTION_STATUSES.AWAITING_APPROVAL;
+    const hasConflicts = transcriptionData.status === TRANSCRIPTION_STATUSES.ERROR;
 
     const hasProvisionContent = provisionContent && Object.keys(provisionContent).length > 0;
     const hasQuizContent = editedQuiz && Object.keys(editedQuiz).length > 0
@@ -225,7 +226,7 @@ export default function ReviewPage() {
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div className="flex-1">
-                    {isIntegrated ? (
+                    {isIntegrated || hasConflicts ? (
                         <>
                             <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
                                 <span>{transcriptionData.title}</span>
@@ -363,11 +364,9 @@ export default function ReviewPage() {
                                         placeholder="Edit highlights using Markdown..."
                                         rows={15}
                                         className={
-                                            `w-full font-mono whitespace-pre-wrap ${isIntegrated ? "max-h-[113vh]" : (inDraft ? "max-h-[60vh]" : "max-h-[53vh]")
+                                            `w-full font-mono whitespace-pre-wrap ${isIntegrated ? "max-h-[113vh]" : (inDraft ? "max-h-[60vh]" :(hasConflicts? "max-h-[61vh]": "max-h-[53vh]"))
                                             }`
                                         }
-
-
                                         disabled={isIntegrated}
                                     />
                                 </div>
@@ -379,20 +378,22 @@ export default function ReviewPage() {
                             <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
                             <CardContent className="space-y-2.5">
                                 {(awaitingApproval || inDraft) && (
-                                    <Button size="sm" className="w-full" onClick={() => setIsFolderModalOpen(true)} disabled={isSaving}>
+                                    <Button size="sm" className="w-full cursor-pointer" onClick={() => setIsFolderModalOpen(true)} disabled={isSaving}>
                                         Save & Finalize Integration
                                     </Button>
                                 )}
                                 {awaitingApproval && (
-                                    <Button size="sm" variant="outline" className="w-full" onClick={handleSaveDraft} disabled={isSaving}>
+                                    <Button size="sm" variant="outline" className="w-full cursor-pointer" onClick={handleSaveDraft} disabled={isSaving}>
                                         <Save className="mr-2 h-4 w-4" /> Save as Draft
                                     </Button>
                                 )}
-                                <Button size="sm" variant="outline" className="w-full" disabled><Download className="mr-2 h-4 w-4" />Download Content</Button>
-                                <Button size="sm" variant="destructive" className="w-full" onClick={handleDiscard} disabled={isSaving}>
+                                <Button size="sm" variant="outline" className="w-full cursor-pointer" disabled><Download className="mr-2 h-4 w-4" />Download Content</Button>
+                                {!hasConflicts && (
+                                    <Button size="sm" variant="destructive" className="w-full cursor-pointer" onClick={handleDiscard} disabled={isSaving}>
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Discard
                                 </Button>
+                                )}
                             </CardContent>
                         </Card>
                     )}
