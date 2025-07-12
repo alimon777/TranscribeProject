@@ -20,14 +20,14 @@ export const TRANSCRIPTION_STATUSES = {
 };
 
 
-// export const LOCAL_ANOMALY_TYPES = {
-//   SEMANTIC_DIFFERENCE: "Semantic Difference",
-//   OVERLAP: "Significant Overlap",
-//   CONTRADICTION: "CONTRADICTION",
-//   OUTDATED_INFO: "Outdated Information",
-// };
+export const ANOMALY_TYPES = {
+  SEMANTIC_DIFFERENCE: "SEMANTIC_DIFFERENCE",
+  OVERLAP: "OVERLAP",
+  CONTRADICTION: "CONTRADICTION",
+  OUTDATED_INFO: "OUTDATED_INFO",
+};
 
-export const LOCAL_CONFLICT_STATUSES = {
+export const CONFLICT_STATUSES = {
   PENDING: "Pending Review",
   RESOLVED_MERGED: "Resolved (Merged)",
   REJECTED: "Rejected",

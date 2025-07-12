@@ -20,7 +20,7 @@ export default function App() {
         <Router>
           <TooltipProvider>
             <AppBar />
-            <main className="pt-4 px-4 md:pt-6 md:px-6 md:pb-12">
+            <main className="pt-4 px-4 md:pt-6 md:px-6 md:pb-3">
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route

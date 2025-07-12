@@ -5,8 +5,8 @@ import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { 
   TRANSCRIPTION_STATUSES, 
-  // LOCAL_ANOMALY_TYPES, 
-  LOCAL_CONFLICT_STATUSES 
+  ANOMALY_TYPES, 
+  CONFLICT_STATUSES 
 } from '@/lib/constants';
 
 export default function StatusBadge({ status }) {
@@ -55,20 +55,20 @@ export default function StatusBadge({ status }) {
         };
       
       // NEW: Anomaly Types for Admin Dashboard
-      case "SEMANTIC_DIFFERENCE":
+      case ANOMALY_TYPES.SEMANTIC_DIFFERENCE:
         return {
           variant: "secondary",
           className: `${chipBaseStyle} bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300`,
           text: status,
         };
-      case "OVERLAP":
+      case ANOMALY_TYPES.OVERLAP:
         return {
           variant: "secondary",
           className: `${chipBaseStyle} bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300`,
           text: status,
         };
-      case "CONTRADICTION":
-      case "OUTDATED_INFO":
+      case ANOMALY_TYPES.CONTRADICTION:
+      case ANOMALY_TYPES.OUTDATED_INFO:
         return {
           variant: "secondary",
           className: `${chipBaseStyle} bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300`,
@@ -76,19 +76,19 @@ export default function StatusBadge({ status }) {
         };
       
       // NEW: Conflict Statuses for Admin Dashboard
-      case LOCAL_CONFLICT_STATUSES.PENDING:
+      case CONFLICT_STATUSES.PENDING:
          return {
           variant: "secondary",
           className: `${chipBaseStyle} bg-yellow-100 dark:bg-yellow-800/30 text-yellow-700 dark:text-yellow-300`,
           text: status,
         };
-      case LOCAL_CONFLICT_STATUSES.RESOLVED_MERGED:
+      case CONFLICT_STATUSES.RESOLVED_MERGED:
         return {
           variant: "secondary",
           className: `${chipBaseStyle} bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300`,
           text: status,
         };
-      case LOCAL_CONFLICT_STATUSES.REJECTED:
+      case CONFLICT_STATUSES.REJECTED:
         return {
           variant: "secondary",
           className: `${chipBaseStyle} bg-red-100 dark:bg-red-800/30 text-red-700 dark:text-red-300`,

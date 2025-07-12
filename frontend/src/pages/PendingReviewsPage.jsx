@@ -61,12 +61,12 @@ function CurrentQueueCard({ items, onRefresh, isRefreshing, lastUpdate }) {
     const navigate = useNavigate();
 
     return (
-        <Card className="lg:col-span-1 gap-0">
+        <Card className="lg:col-span-1 gap-0 pb-0">
             <CardHeader className="flex flex-row justify-between items-center pb-2">
                 <div className="flex items-center gap-3">
                     <Logs size={20} className="text-muted-foreground" />
                     <div>
-                    <CardTitle className="text-lg">Current Queue</CardTitle>
+                        <CardTitle className="text-lg">Current Queue</CardTitle>
                         <CardDescription className="text-xs">
                             Items being processed or awaiting approval.
                         </CardDescription>
@@ -86,7 +86,7 @@ function CurrentQueueCard({ items, onRefresh, isRefreshing, lastUpdate }) {
                         <p className="text-muted-foreground -mt-10 text-sm">No items currently pending.</p>
                     </div>
                 ) : (
-                    <div className="max-h-[60vh] overflow-y-auto p-4">
+                    <div className="h-[45vh] overflow-y-auto p-4">
                         <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
@@ -147,11 +147,11 @@ function IntegratedDraftsConflictsCard({ historyItems, draftItems, conflictItems
             dateLabel: 'Updated At',
         },
     };
-    
+
     const currentView = cardConfig[activeTab];
 
     return (
-        <Card className="lg:col-span-1 gap-0">
+        <Card className="lg:col-span-1 gap-0 pb-0">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -171,18 +171,18 @@ function IntegratedDraftsConflictsCard({ historyItems, draftItems, conflictItems
                     >
                         <ToggleGroupItem value="history" aria-label="View history" className="px-3">Integrated</ToggleGroupItem>
                         <ToggleGroupItem value="drafts" aria-label="View drafts" className="px-0">Drafts</ToggleGroupItem>
-                        <ToggleGroupItem value="conflicts" aria-label="View conflicts"className="px-2">Conflicts</ToggleGroupItem>
+                        <ToggleGroupItem value="conflicts" aria-label="View conflicts" className="px-2">Conflicts</ToggleGroupItem>
                     </ToggleGroup>
                 </div>
             </CardHeader>
             <CardContent className="p-0">
                 {currentView.items.length === 0 ? (
                     <div className='flex flex-col items-center justify-center p-8 text-center'>
-                       <CardIllustration className='h-48 w-48' />
-                       <p className="text-muted-foreground -mt-10 text-sm">{currentView.emptyMessage}</p>
+                        <CardIllustration className='h-48 w-48' />
+                        <p className="text-muted-foreground -mt-10 text-sm">{currentView.emptyMessage}</p>
                     </div>
                 ) : (
-                    <div className="max-h-[60vh] overflow-y-auto p-4">
+                    <div className="h-[45vh] overflow-y-auto p-4">
                         <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
@@ -243,7 +243,7 @@ export default function PendingReviewsPage() {
             alert("Error: Could not fetch transcription data."); // <-- REPLACED
         }
     };
-    
+
     useEffect(() => {
         setIsLoading(true);
         fetchData().finally(() => setIsLoading(false));
@@ -255,7 +255,7 @@ export default function PendingReviewsPage() {
         setIsRefreshing(false);
     };
 
-    const itemsToPoll = useMemo(() => 
+    const itemsToPoll = useMemo(() =>
         transcriptionData.pending.filter(item =>
             item.status === TRANSCRIPTION_STATUSES.PROCESSING ||
             item.status === TRANSCRIPTION_STATUSES.FINALIZING
@@ -268,7 +268,7 @@ export default function PendingReviewsPage() {
         const intervalId = setInterval(async () => {
             const pollPromises = itemsToPoll.map(item => getTranscriptionDetails(item.id));
             const results = await Promise.allSettled(pollPromises);
-            
+
             let hasChanges = false;
             setTranscriptionData(currentData => {
                 const newState = {
@@ -285,7 +285,7 @@ export default function PendingReviewsPage() {
 
                         if (originalItem.status !== updatedItem.status) {
                             hasChanges = true;
-                            
+
                             const itemIndexInPending = newState.pending.findIndex(p => p.id === updatedItem.id);
                             if (itemIndexInPending === -1) return;
 
@@ -296,7 +296,7 @@ export default function PendingReviewsPage() {
                             if (originalItem.status === TRANSCRIPTION_STATUSES.FINALIZING && updatedItem.status === TRANSCRIPTION_STATUSES.INTEGRATED) {
                                 newState.history.unshift(finalItem);
                                 alert(`Integrated: "${finalItem.title}" is complete.`); // <-- REPLACED
-                            } 
+                            }
                             // Flow 2: Finalizing -> Error
                             else if (originalItem.status === TRANSCRIPTION_STATUSES.FINALIZING && updatedItem.status === TRANSCRIPTION_STATUSES.ERROR) {
                                 newState.conflicts.unshift(finalItem);
@@ -308,7 +308,7 @@ export default function PendingReviewsPage() {
                                 alert(`Ready for Review: "${finalItem.title}" is awaiting approval.`); // <-- REPLACED
                             }
                             else {
-                                 newState.pending.splice(itemIndexInPending, 0, finalItem);
+                                newState.pending.splice(itemIndexInPending, 0, finalItem);
                             }
                         }
                     }
@@ -319,7 +319,7 @@ export default function PendingReviewsPage() {
                     newState.conflicts.sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
                     return newState;
                 }
-                
+
                 return currentData;
             });
         }, 10000);
@@ -328,45 +328,22 @@ export default function PendingReviewsPage() {
 
     }, [itemsToPoll]); // <-- REPLACED: Dependency is now alert
 
-
-    // --- Rendering Logic (Unchanged) ---
-    if (isLoading) {
-        return (
-            <div className="p-4 md:p-6 w-full">
-                <div className="mb-6">
-                    <Skeleton className="h-8 w-1/3 mb-2" />
-                    <Skeleton className="h-5 w-1/2" />
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-pulse">
-                    <Card className="lg:col-span-1">
-                        <CardHeader className='pb-2'><div className="flex justify-between items-center"><Skeleton className="h-6 w-1/3" /><Skeleton className="h-6 w-1/4" /></div></CardHeader>
-                        <CardContent className="p-4 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></CardContent>
-                    </Card>
-                    <Card className="lg:col-span-1">
-                        <CardHeader><div className="flex justify-between items-center"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-9 w-20" /></div><Skeleton className="h-4 w-full mt-1" /></CardHeader>
-                        <CardContent className="p-4 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></CardContent>
-                    </Card>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="p-4 md:p-6 w-full">
+        <div className="pt-4 md:p-6 w-full">
             <div className="mb-6">
                 <h1 className="text-3xl font-semibold mb-1">Pending Reviews & In-Progress</h1>
                 <p className="text-muted-foreground">Track transcriptions being processed or awaiting review.</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <CurrentQueueCard 
-                    items={transcriptionData.pending} 
+                <CurrentQueueCard
+                    items={transcriptionData.pending}
                     onRefresh={handleRefresh}
                     isRefreshing={isRefreshing}
                     lastUpdate={lastUpdate}
                 />
-                <IntegratedDraftsConflictsCard 
-                    historyItems={transcriptionData.history} 
-                    draftItems={transcriptionData.drafts} 
+                <IntegratedDraftsConflictsCard
+                    historyItems={transcriptionData.history}
+                    draftItems={transcriptionData.drafts}
                     conflictItems={transcriptionData.conflicts}
                 />
             </div>

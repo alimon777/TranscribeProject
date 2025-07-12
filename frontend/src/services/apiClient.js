@@ -117,7 +117,7 @@ export const updateTranscription = (metadata) => {
 }
 
 export const relocateTranscription = (transcriptionId, folderId) => {
-  return apiClient.put("/reloacte/transcription", null, {
+  return apiClient.put("/relocate/transcription", null, {
     params: {
       transcription_id: transcriptionId,
       folder_id: folderId,

@@ -397,16 +397,74 @@ def delete_transcription(transcription_id: int, db: Session = Depends(get_db)):
     return {"message": f"Transcription {transcription_id} deleted successfully"}
 
 @router.get("/admin/conflicts", response_model=ConflictListWithStatsResponse)
-def get_conflicts(status_filters: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    conflicts = db.query(Conflict)
-    query = conflicts.all()
-    stats = calculate_conflict_stats(query)
-    print("status", status_filters)
+def get_conflicts(
+    status_filters: Optional[str] = Query(None, description="Comma-separated list of conflict statuses (e.g., 'Pending Review,Rejected')"),
+    anomaly_type_filters: Optional[str] = Query(None, description="Comma-separated list of anomaly types (e.g., 'OVERLAP,CONTRADICTION')"),
+    search: Optional[str] = Query(None, description="Search term to filter conflicts by summary or details."),
+    sort_by: str = Query("updated_at", description="Field to sort by. Currently supports 'updated_at'."),
+    sort_order: str = Query("desc", description="Sort order: 'asc' or 'desc'."),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves a list of conflicts with powerful filtering, searching, and sorting.
+    - Calculates statistics based on the total set of conflicts.
+    - Returns a list of conflicts that matches the applied filters.
+    """
+    # 1. Create a base query object. Do not execute it yet.
+    base_query = db.query(Conflict)
+
+    # 2. Calculate stats on the *entire* dataset before applying list filters.
+    # This provides a global overview (e.g., "Showing 10 of 50 total pending conflicts").
+    all_conflicts_for_stats = base_query.all()
+    stats = calculate_conflict_stats(all_conflicts_for_stats)
+
+    # 3. Start building the dynamic query for the response list.
+    filtered_query = base_query
+
+    # 4. Apply filters progressively.
+
+    # Filter by Status
     if status_filters:
-        status_list = status_filters.split(",")
-        conflicts = conflicts.filter(Conflict.status.in_(status_list))
-    conflicts = conflicts.all()
-    return {"conflicts": [ConflictResponse.model_validate(c) for c in conflicts], "stats": stats}
+        # Clean up input: split by comma and remove leading/trailing whitespace
+        status_list = [s.strip() for s in status_filters.split(",") if s.strip()]
+        if status_list:
+            filtered_query = filtered_query.filter(Conflict.status.in_(status_list))
+
+    # Filter by Anomaly Type
+    if anomaly_type_filters:
+        anomaly_list = [a.strip() for a in anomaly_type_filters.split(",") if a.strip()]
+        if anomaly_list:
+            filtered_query = filtered_query.filter(Conflict.anomaly_type.in_(anomaly_list))
+    
+    # Filter by Search Term
+    if search:
+        # Assuming your Conflict model has 'summary' and 'details' fields.
+        # Adjust field names (e.g., Conflict.source_text) as needed.
+        search_term = f"%{search.lower()}%"
+        filtered_query = filtered_query.filter(
+            or_(
+                func.lower(Conflict.existing_content_snippet).like(search_term),
+                func.lower(Conflict.new_content_snippet).like(search_term)
+            )
+        )
+
+    # 5. Apply sorting.
+    # This structure can be easily extended with a map for more sortable columns.
+    if sort_by == "updated_at":
+        sort_column = Conflict.updated_date
+        if sort_order.lower() == "asc":
+            filtered_query = filtered_query.order_by(asc(sort_column))
+        else:
+            filtered_query = filtered_query.order_by(desc(sort_column))
+    
+    # 6. Now, and only now, execute the fully constructed query.
+    conflicts = filtered_query.all()
+
+    # 7. Format and return the final response.
+    return {
+        "conflicts": [ConflictResponse.model_validate(c) for c in conflicts],
+        "stats": stats
+    }
 
 @router.get("/admin/conflicts/{conflict_id}/detail", response_model=ConflictResponse)
 def get_conflict_detail(conflict_id: int, db: Session = Depends(get_db)):
@@ -679,7 +737,7 @@ async def get_transcription(transcription_id: int):
         db.close()
 
 
-@router.put("/reloacte/transcription")
+@router.put("/relocate/transcription")
 def relocate_transcription(transcription_id: str, folder_id: str,db: Session = Depends(get_db)):
     transcription = db.query(Transcription).get(transcription_id)
     if not transcription:
